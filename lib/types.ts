@@ -5,4 +5,5 @@ export type Task={id:string;title:string;owner:string;due:string;priority:string
 export type Run={id:string;workflowId:number;title:string;createdAt:string;question:string;sourceIds:string[];findings:Finding[];versions:Version[];status:string;reviewVersion?:number;approvedVersion?:number;reviewReason?:string;tasks:Task[];scenario?:{delay:number;dates:string[]};correction?:{value:string;reason:string};confirmation?:{name:string;date:string};events?:{contact:string;outcome:string}[];comments:{text:string;actor:Role;at:string}[];handoff?:string};
 export type Audit={id:string;at:string;actor:Role;action:string;runId?:string;detail:string};
 export type Upload={id:string;title:string;hash:string;size:number;mime:string;createdAt:string;owner:Role;extraction:string};
-export type Store={schema:1;runs:Run[];audit:Audit[];uploads:Upload[];projects:{id:string;name:string;purpose:string}[];settings:{name:string;language:string;notifications:boolean};revoked:string[]};
+export type WorkspaceSettings={name:string;language:string;notifications:boolean;email?:string;phone?:string;designation?:string;timeZone?:string;dateFormat?:string};
+export type Store={schema:1;runs:Run[];audit:Audit[];uploads:Upload[];projects:{id:string;name:string;purpose:string}[];settings:WorkspaceSettings;profiles?:Partial<Record<Role,WorkspaceSettings>>;revoked:string[]};

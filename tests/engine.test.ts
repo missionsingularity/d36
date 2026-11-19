@@ -64,3 +64,19 @@ test('planning XLSX includes the private scenario without changing baseline due 
   assert.equal(proposals[2].getCell(2).text,'Baseline 2026-11-21 / proposed 2026-11-24');
   assert.deepEqual(scenario.tasks.map(task=>task.due),plan.tasks.map(task=>task.due));
 });
+
+test('profile patches retain fields, isolate personas and reject invalid values',async()=>{
+  const {settingsFor,updateSettings}=await import('../lib/settings');
+  const state=readStore();
+  updateSettings(state,'officer',{name:'Sample Officer',email:'sample@example.invalid'});
+  updateSettings(state,'officer',{language:'Hindi',notifications:false});
+  assert.equal(settingsFor(state,'officer').name,'Sample Officer');
+  assert.equal(settingsFor(state,'officer').email,'sample@example.invalid');
+  assert.equal(settingsFor(state,'reviewer').name,'Demo Reviewer');
+  updateSettings(state,'guest',{name:'Guest Example'});
+  assert.equal(settingsFor(state,'guest').name,'Guest Example');
+  assert.equal(settingsFor(state,'officer').language,'Hindi');
+  assert.throws(()=>updateSettings(state,'officer',{name:' '}));
+  assert.throws(()=>updateSettings(state,'officer',{notifications:'false'}));
+  assert.throws(()=>updateSettings(state,'officer',{timeZone:'Invalid'}));
+});

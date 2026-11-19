@@ -25,3 +25,9 @@ The workflow QA code checkpoint is 0043aa2, followed by the final follow-up chan
 ## Remaining limitations
 
 Demo personas and approvals are simulated. Sharing is local and sends no email. Outreach is simulated and makes no external contact. PDF/DOCX uploads preserve original bytes without binary extraction. PDF uses Latin fonts, with DOCX/TXT for complete multilingual passages. Production authentication, live integrations, and multi-process persistence are outside the demo scope. Responsive checks cover overflow at 1440, 1280, and 768 pixels. A formal accessibility audit has not been performed.
+
+## Account, preferences and permissions correction
+
+Account and Preferences now use separate forms with validated partial saves. Profiles are stored per demo persona, preserving existing officer settings. Contact information and designation are editable. Language, time zone, date format and notification preferences persist independently. Guests can save their own profile preferences while remaining read-only for work records. The reviewer can restrict or restore ordinary source access; base restricted-source rules remain enforced.
+
+Typecheck and all 21 engine/settings tests passed. Two Chromium settings journeys passed, covering save/refresh, persona isolation, guest profile saving, source restrictions, restoration and HTTP source denial. Preference selectors now have explicit accessible names. The final Chromium rerun passed both journeys with the busy-state protection during persona switching.
