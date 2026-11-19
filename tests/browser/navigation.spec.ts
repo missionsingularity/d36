@@ -1,0 +1,31 @@
+import {expect,test} from '@playwright/test';
+import {workflows} from '../../lib/catalog';
+
+test('New Chat, citation preview, notifications and local sharing stay connected', async ({page}) => {
+  await page.goto('/');
+  await page.getByRole('button', {name:'Compare circulars',exact:true}).click();
+  await page.getByRole('button', {name:'Start demonstration'}).click();
+  await expect(page.locator('.user-message')).toHaveText(workflows[0].question, {timeout:20000});
+  const citation = page.locator('.findings .preview-wrap').first();
+  await citation.getByRole('button').hover();
+  await expect(citation.locator('.hover-preview')).toBeVisible();
+  await citation.getByRole('button').click();
+  await expect(page.locator('dialog .passage.highlight')).toBeVisible();
+  await page.getByRole('button', {name:'Close dialog'}).click();
+  await page.getByRole('button', {name:'Open in Work'}).click();
+  await expect(page).toHaveURL(/\/work\//);
+  const record = page.url();
+  await page.getByRole('button', {name:'Share',exact:true}).click();
+  await page.getByLabel('Recipient access').selectOption('reviewer');
+  const response = page.waitForResponse(r => r.request().method()==='POST' && r.url().endsWith('/api/demo'));
+  await page.getByRole('button', {name:'Confirm and save'}).click();
+  const shared = await response;
+  expect(shared.ok()).toBeTruthy();
+  expect((await shared.json()).url).toBe('/chat/'+record.split('/').pop());
+  await expect(page.getByLabel('Work link')).toHaveValue(/\/chat\//);
+  await page.getByRole('button', {name:'Close dialog'}).click();
+  await page.getByRole('button', {name:'Notifications',exact:true}).click();
+  await expect(page.getByRole('heading', {name:'Notifications'})).toBeVisible();
+  await page.locator('.notification').first().click();
+  await expect(page).toHaveURL(record);
+});

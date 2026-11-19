@@ -1,6 +1,7 @@
 node_modules/
 .next/
 .next-test/
+.next-build/
 .data/
 .test-data/
 test-results/
