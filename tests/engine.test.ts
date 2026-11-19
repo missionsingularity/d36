@@ -31,3 +31,36 @@ test('15 language ambiguity cannot bypass confirmation',()=>{const r=launch(8,'o
 test('unknown historic dates never cite a future source; correction roles remain independent',()=>{assert.equal(launch(1,'officer','2020-01-01').findings[0].citations.length,0);assert.throws(()=>launch(1,'officer','2026-02-30'));const r=launch(3,'officer');rejectUnchanged(()=>act(r.id,{type:'correct',value:'18',reason:'Reviewer self correction'},'reviewer'));assert.equal(readStore().audit.at(-1)!.action,'Action blocked')});
 test('all ten workflows produce real PDF and TXT with resolvable evidence',async()=>{await seedFiles();for(const w of workflows){const r=launch(w.id,'officer');for(const f of r.findings)for(const c of f.citations){const [id,section]=c.split(':');assert.ok(sources.find(s=>s.id===id)?.paragraphs[Number(section)-1])}const output=await exportRun(r,'pdf');const pdf=await PDFDocument.load(output.buffer);assert.ok(pdf.getPageCount()>0);assert.ok((await exportRun(r,'txt')).buffer.toString().includes(r.id))}});
 test('Office formats parse and original hashes survive repeat seed and edits',async()=>{const r=launch(6,'officer');const doc=await JSZip.loadAsync((await exportRun(r,'docx')).buffer);assert.match(await doc.file('word/document.xml')!.async('string'),/Office note/);const book=new ExcelJS.Workbook();await book.xlsx.load((await exportRun(r,'xlsx')).buffer as never);assert.ok(book.worksheets[0].rowCount>4);const ppt=await JSZip.loadAsync((await exportRun(r,'pptx')).buffer);assert.equal(Object.keys(ppt.files).filter(p=>/^ppt\/slides\/slide\d+\.xml$/.test(p)).length,r.findings.length);const file=path.join(process.env.BRAHMA_DATA_DIR!,'sources','PEN-A.txt');const original=hash(fs.readFileSync(file));await seedFiles();act(r.id,{type:'edit',text:'New derivative content'},'officer');assert.equal(hash(fs.readFileSync(file)),original);assert.equal(readStore().runs.find(x=>x.id===r.id)!.versions.length,2)});
+
+test('manual handoff is revoked by reopening review or editing an approved version',()=>{
+  const reopened=approved();
+  act(reopened.id,{type:'handoff'},'officer');
+  const pending=act(reopened.id,{type:'request-review'},'officer');
+  assert.equal(pending.approvedVersion,undefined);
+  assert.equal(pending.handoff,undefined);
+  rejectUnchanged(()=>act(reopened.id,{type:'handoff'},'officer'));
+  act(reopened.id,{type:'return',reason:'Missing proof'},'reviewer');
+  rejectUnchanged(()=>act(reopened.id,{type:'handoff'},'officer'));
+  const impacted=approved();
+  act(impacted.id,{type:'handoff'},'officer');
+  act(launch(7,'officer').id,{type:'impact'},'officer');
+  assert.equal(readStore().runs.find(r=>r.id===impacted.id)?.handoff,undefined);
+  rejectUnchanged(()=>act(impacted.id,{type:'handoff'},'officer'));
+  const edited=approved();
+  act(edited.id,{type:'handoff'},'officer');
+  const draft=act(edited.id,{type:'edit',text:edited.versions[0].text+'\nRevision'},'officer');
+  assert.equal(draft.handoff,undefined);
+  assert.equal(draft.approvedVersion,undefined);
+});
+
+test('planning XLSX includes the private scenario without changing baseline due dates',async()=>{
+  const plan=launch(5,'officer');
+  const scenario=act(plan.id,{type:'scenario',delay:3},'officer');
+  const book=new ExcelJS.Workbook();
+  await book.xlsx.load((await exportRun(scenario,'xlsx')).buffer as never);
+  const sheet=book.worksheets[0];
+  const proposals=sheet.getRows(1,sheet.rowCount)!.filter(row=>row.getCell(4).text==='Private scenario');
+  assert.equal(proposals.length,plan.tasks.length);
+  assert.equal(proposals[2].getCell(2).text,'Baseline 2026-11-21 / proposed 2026-11-24');
+  assert.deepEqual(scenario.tasks.map(task=>task.due),plan.tasks.map(task=>task.due));
+});

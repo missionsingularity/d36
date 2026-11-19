@@ -26,3 +26,69 @@ test('API permissions, hostile origin, real uploaded originals and downloadable 
 });
 
 
+
+test('RTI review return and reopened office-note review block handoff',async({page})=>{
+  const rti=await start(page,9);
+  const decisions=()=>page.locator('.tabs').getByRole('button',{name:'Decisions'}).click();
+  const requestReview=async()=>{
+    await page.getByRole('button',{name:'Request review',exact:true}).click();
+    await expect(page.locator('.meta-line')).toContainText('Review requested');
+  };
+  const handoff=()=>page.getByRole('button',{name:'Prepare manual handoff'}).click();
+  await decisions();
+  await handoff();
+  await expect(page.locator('.error-banner')).toContainText('Review the current version');
+  await requestReview();
+  await persona(page,'reviewer');
+  await page.goto(rti);
+  await decisions();
+  await page.getByRole('button',{name:'Return / clarify'}).click();
+  await page.getByLabel('Required changes').fill('Resolve the missing RTI evidence first.');
+  await page.getByRole('button',{name:'Confirm and save'}).click();
+  await expect(page.locator('.meta-line')).toContainText('Returned');
+  await handoff();
+  await expect(page.locator('.error-banner')).toContainText('Review the current version');
+
+  const note=await start(page,6);
+  await decisions();
+  await requestReview();
+  await page.getByRole('button',{name:'Approve version',exact:true}).click();
+  await page.getByLabel('Determination / limitations acknowledged').fill('Reviewed for local simulation.');
+  await page.getByRole('button',{name:'Confirm and save'}).click();
+  await expect(page.locator('.meta-line')).toContainText('Reviewed');
+  await handoff();
+  await expect(page.getByText(/manual package prepared/)).toBeVisible();
+  await requestReview();
+  await page.goto(note);
+  await decisions();
+  await expect(page.locator('.meta-line')).toContainText('Approved version: None');
+  await expect(page.getByText(/manual package prepared/)).toHaveCount(0);
+  await handoff();
+  await expect(page.locator('.error-banner')).toContainText('Review the current version');
+});
+
+test('selected historical date and reviewer-applied task dates persist through the interface',async({page})=>{
+  await page.goto('/customize');
+  await page.getByTestId('workflow-2').click();
+  await page.getByLabel('Event date').fill('2020-01-01');
+  await page.getByRole('button',{name:'Start demonstration'}).click();
+  await expect(page.locator('.findings')).toContainText('No dated source available',{timeout:20000});
+  await expect(page.locator('.findings .citation')).toHaveCount(0);
+  const plan=await start(page,5);
+  await page.getByRole('button',{name:'Explore a three-day review delay'}).click();
+  const row=page.getByRole('row').filter({hasText:'Review packet'});
+  await expect(row).toContainText('2026-11-21');
+  await expect(row).toContainText('2026-11-24');
+  await page.getByRole('button',{name:'Confirm scenario dates'}).click();
+  await page.getByRole('button',{name:'Confirm and save'}).click();
+  await expect(page.locator('dialog [role=alert]')).toContainText('Reviewer and scenario required');
+  await page.keyboard.press('Escape');
+  await persona(page,'reviewer');
+  await page.goto(plan);
+  await page.getByRole('button',{name:'Confirm scenario dates'}).click();
+  await page.getByRole('button',{name:'Confirm and save'}).click();
+  await expect(page.getByRole('columnheader',{name:'Private scenario'})).toHaveCount(0);
+  await page.reload();
+  await page.locator('.tabs').getByRole('button',{name:/Tasks/}).click();
+  await expect(page.getByRole('row').filter({hasText:'Review packet'})).toContainText('24 Nov 2026');
+});
