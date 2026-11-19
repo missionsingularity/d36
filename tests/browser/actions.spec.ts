@@ -90,5 +90,5 @@ test('selected historical date and reviewer-applied task dates persist through t
   await expect(page.getByRole('columnheader',{name:'Private scenario'})).toHaveCount(0);
   await page.reload();
   await page.locator('.tabs').getByRole('button',{name:/Tasks/}).click();
-  await expect(page.getByRole('row').filter({hasText:'Review packet'})).toContainText('24 Nov 2026');
+  await expect(page.getByRole('row',{name:/^Review packet /})).toContainText('24 Nov 2026');
 });

@@ -55,3 +55,9 @@ Prior Chromium evidence covers launch, predefined question, Chat/Work ID, cited 
 - [ ] Rerun typecheck/build/engine/browser verification after final changes, including the full stakeholder script.
 - [x] Replaced the stalled development listener. The homepage returned HTTP 200 on port 3000. Chromium verification ran on isolated port 3100.
 - [ ] Final handover and local checkpoint. GitHub HTTP 403 remains known; no retry.
+
+## Workflow QA checkpoint
+
+- [x] A real browser opened every displayed citation and generated and parsed all five draft formats for each of the ten workflows.
+- [x] Fixed stale approvals/handoff indicators, duplicate in-flight launches, and missing scenario rows in XLSX exports.
+- [ ] Finish the remaining scenario-specific actions and presentation coverage listed in [WORKFLOW_TEST_REPORT.md](WORKFLOW_TEST_REPORT.md).

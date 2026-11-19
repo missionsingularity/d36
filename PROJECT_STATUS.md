@@ -18,6 +18,10 @@ New Chat, Projects, Customize, Documents, My Tasks, Profile, and the shared Chat
 
 - Follow-up Chromium runs passed the ten predefined-question checks and the New Chat, hover preview, local sharing, and notifications journey. The first navigation attempt needed a longer wait for the initial route compilation.
 
+## Workflow verification checkpoint
+
+The workflow QA code checkpoint is 0043aa2, followed by the final follow-up changes and report in the latest local commit. All ten browser launch/evidence/export cases passed. The expanded run had one sharing timing failure; the patch passed targeted reruns. TypeScript, production build, 20 engine tests and all three focused Chromium regressions passed. The development homepage returned HTTP 200 on port 3000. See [WORKFLOW_TEST_REPORT.md](WORKFLOW_TEST_REPORT.md) for the ten-workflow matrix, fixes, browser evidence, sample outputs and unresolved coverage.
+
 ## Remaining limitations
 
 Demo personas and approvals are simulated. Sharing is local and sends no email. Outreach is simulated and makes no external contact. PDF/DOCX uploads preserve original bytes without binary extraction. PDF uses Latin fonts, with DOCX/TXT for complete multilingual passages. Production authentication, live integrations, and multi-process persistence are outside the demo scope. Responsive checks cover overflow at 1440, 1280, and 768 pixels. A formal accessibility audit has not been performed.

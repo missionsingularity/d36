@@ -36,6 +36,12 @@ for (const workflow of workflows) {
     await expect(page).toHaveURL(new RegExp('/chat/'+run.id));
     await expect(page.locator('.user-message')).toHaveText(workflow.question,{timeout:20000});
 
+    if (workflow.id===7) {
+      await expect(page.locator('.findings')).toContainText('Prior requirement');
+      await expect(page.locator('.findings')).toContainText('10-working-day verification target');
+      expect(run.findings.find(f=>f.heading==='What changed')?.citations).toContain('PEN-A:1');
+    }
+
     for (const [index,finding] of run.findings.entries()) {
       const section = page.locator('.findings section').nth(index);
       await expect(section.getByRole('heading')).toHaveText(finding.heading);

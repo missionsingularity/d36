@@ -14,6 +14,7 @@ test('New Chat, citation preview, notifications and local sharing stay connected
   await page.getByRole('button', {name:'Close dialog'}).click();
   await page.getByRole('button', {name:'Open in Work'}).click();
   await expect(page).toHaveURL(/\/work\//);
+  await expect(page.locator('.stepper')).toBeVisible();
   const record = page.url();
   await page.getByRole('button', {name:'Share',exact:true}).click();
   await page.getByLabel('Recipient access').selectOption('reviewer');
