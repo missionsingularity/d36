@@ -92,3 +92,19 @@ test('selected historical date and reviewer-applied task dates persist through t
   await page.locator('.tabs').getByRole('button',{name:/Tasks/}).click();
   await expect(page.getByRole('row',{name:/^Review packet /})).toContainText('24 Nov 2026');
 });
+
+test('failed draft save preserves unsaved text after switching views',async({page})=>{
+  const work=await start(page,6);
+  await page.locator('.tabs').getByRole('button',{name:'Documents',exact:true}).click();
+  const editor=page.getByRole('textbox',{name:'Working draft'});
+  await editor.fill('Local unsaved draft preserved after access changes.');
+  await persona(page,'guest');
+  await page.goto(work);
+  await page.locator('.tabs').getByRole('button',{name:'Documents',exact:true}).click();
+  await expect(editor).toHaveValue('Local unsaved draft preserved after access changes.');
+  await page.getByRole('button',{name:'Save new version'}).click();
+  await expect(page.locator('.error-banner')).toContainText('read-only');
+  await page.locator('.tabs').getByRole('button',{name:'Overview'}).click();
+  await page.locator('.tabs').getByRole('button',{name:'Documents',exact:true}).click();
+  await expect(editor).toHaveValue('Local unsaved draft preserved after access changes.');
+});
