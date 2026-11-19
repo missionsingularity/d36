@@ -80,3 +80,19 @@ test('profile patches retain fields, isolate personas and reject invalid values'
   assert.throws(()=>updateSettings(state,'officer',{notifications:'false'}));
   assert.throws(()=>updateSettings(state,'officer',{timeZone:'Invalid'}));
 });
+
+test('PDF and DOCX uploads extract actual text and retain page markers',async()=>{
+  const {extractOriginal}=await import('../lib/extraction');
+  const {Document,Paragraph,Packer}=await import('docx');
+  const pdf=await PDFDocument.create();
+  pdf.addPage().drawText('Synthetic pension proposal pending annexure');
+  const pdfBytes=Buffer.from(await pdf.save());
+  const checksum=hash(pdfBytes);
+  const extracted=await extractOriginal(pdfBytes,'pdf');
+  assert.match(extracted,/Page 1/);
+  assert.match(extracted,/Synthetic pension proposal pending annexure/);
+  assert.equal(hash(pdfBytes),checksum);
+  const word=await Packer.toBuffer(new Document({sections:[{children:[new Paragraph('Synthetic office note'),new Paragraph('Missing signed annexure')]}]}));
+  assert.match(await extractOriginal(word,'docx'),/Synthetic office note\nMissing signed annexure/);
+  await assert.rejects(()=>extractOriginal(Buffer.from('Invalid'),'docx'));
+});
