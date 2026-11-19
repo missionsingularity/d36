@@ -1,5 +1,6 @@
 'use client';
 import AccountSettings from './account-settings';
+import {useTheme} from './theme-provider';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {usePathname,useRouter} from 'next/navigation';
 import {Layers,SlidersHorizontal,FileText,Plus,MessageSquare,CheckCircle2,ChevronRight,Search,Bell,Link as LinkIcon,MoreHorizontal,ArrowUp,Paperclip,Mic,PanelLeftClose,Briefcase,ArrowUpRight,Download,Clock,Shield,Sun,Moon,X,Folder,Calendar,AlertCircle,Check,History,Settings,Users,Send,RotateCcw,ExternalLink,Lock} from 'lucide-react';
@@ -13,7 +14,7 @@ function Logo({large=false}:{large?:boolean}){return <img className={large?'lotu
 function Badge({children}:{children:ReactNode}){return <span className="badge">{children}</span>}
 function Dialog({modal,close,error}:{modal:Modal;close:()=>void;error:string}){const ref=useRef<HTMLDialogElement>(null);useEffect(()=>{ref.current?.showModal();return()=>ref.current?.close()},[]);return <dialog ref={ref} onCancel={close} onClick={e=>{if(e.target===e.currentTarget)close()}}><div className="dialog-head"><h2>{modal.title}</h2><button className="icon" aria-label="Close dialog" onClick={close}><X/></button></div><div className="dialog-body">{error&&<p className="notice" role="alert">{error}</p>}{modal.content}</div></dialog>}
 export default function Workspace(){
- const router=useRouter(),pathname=usePathname();const [data,setData]=useState<Data>();const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [toast,setToast]=useState('');const [modal,setModal]=useState<Modal|null>(null);const [dark,setDark]=useState(false);const [collapsed,setCollapsed]=useState(false);const [prompt,setPrompt]=useState('');const [query,setQuery]=useState('');const [tab,setTab]=useState('Overview');const [category,setCategory]=useState('Recommended');const [filter,setFilter]=useState('All tasks');const [settingsTab,setSettingsTab]=useState('Account');const [menu,setMenu]=useState(false);const uploadRef=useRef<HTMLInputElement>(null);
+ const router=useRouter(),pathname=usePathname();const [data,setData]=useState<Data>();const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [toast,setToast]=useState('');const [modal,setModal]=useState<Modal|null>(null);const {dark,setDark}=useTheme();const [collapsed,setCollapsed]=useState(false);const [prompt,setPrompt]=useState('');const [query,setQuery]=useState('');const [tab,setTab]=useState('Overview');const [category,setCategory]=useState('Recommended');const [filter,setFilter]=useState('All tasks');const [settingsTab,setSettingsTab]=useState('Account');const [menu,setMenu]=useState(false);const uploadRef=useRef<HTMLInputElement>(null);
  const parts=pathname.split('/').filter(Boolean),section=parts[0]||'chat',run=data?.runs.find(r=>r.id===parts[1]),workflow=data?.workflows.find(w=>w.id===run?.workflowId);
  const fmt=(date:string)=>{
    if(!data)return defaultDate(date);
@@ -28,8 +29,8 @@ export default function Workspace(){
  };
  const go=(path:string)=>{router.push(path);setQuery('');setMenu(false)};
  async function refresh(){const res=await fetch('/api/demo',{cache:'no-store'});const result=await res.json();if(!res.ok)throw new Error(result.error);setData(result);return result as Data}
- useEffect(()=>{refresh().catch(e=>setError(e.message));setDark(localStorage.getItem('brahma-theme')==='dark')},[]);
- useEffect(()=>{document.documentElement.dataset.theme=dark?'dark':'light';localStorage.setItem('brahma-theme',dark?'dark':'light')},[dark]);
+ useEffect(()=>{refresh().catch(e=>setError(e.message))},[]);
+
  useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),4500);return()=>clearTimeout(t)},[toast]);
  useEffect(()=>{const handler=(e:KeyboardEvent)=>{if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();document.getElementById('global-search')?.focus()}if(e.key==='Escape'){setMenu(false);setQuery('')}};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler)},[]);
  async function post(body:object){setBusy(true);setError('');try{const res=await fetch('/api/demo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const out=await res.json();if(!res.ok)throw new Error(out.error);await refresh();setToast('Saved to this workspace');return out}catch(e){setError((e as Error).message);throw e}finally{setBusy(false)}}

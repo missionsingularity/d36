@@ -31,3 +31,7 @@ Demo personas and approvals are simulated. Sharing is local and sends no email. 
 Account and Preferences now use separate forms with validated partial saves. Profiles are stored per demo persona, preserving existing officer settings. Contact information and designation are editable. Language, time zone, date format and notification preferences persist independently. Guests can save their own profile preferences while remaining read-only for work records. The reviewer can restrict or restore ordinary source access; base restricted-source rules remain enforced.
 
 Typecheck and all 21 engine/settings tests passed. Two Chromium settings journeys passed, covering save/refresh, persona isolation, guest profile saving, source restrictions, restoration and HTTP source denial. Preference selectors now have explicit accessible names. The final Chromium rerun passed both journeys with the busy-state protection during persona switching.
+
+## Theme navigation fix
+
+Appearance now lives in the root layout provider. Saved appearance is applied before page rendering, and page mounts no longer overwrite it with the default. TypeScript passed. Chromium verified dark appearance across New Chat, Projects, Customize, Documents, My Tasks and Profile, including reloads and switching back to light through the overflow menu.
