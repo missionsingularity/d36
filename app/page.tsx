@@ -1,0 +1,1 @@
+export default function Home(){return <main><img src="/lotus.svg" width="70" alt="BrahmaGPT lotus"/><h1>BrahmaGPT</h1><p>A considered workspace for government work.</p><p>Illustrative workspace · Synthetic demonstration material</p></main>}

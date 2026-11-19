@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.data/
+.test-data/
+test-results/
+playwright-report/
+private/
+reference/
+MASTER_CODEX_PROMPT.md
+*.env
+.env.*
+!.env.example
+*.tsbuildinfo
