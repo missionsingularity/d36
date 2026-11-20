@@ -83,3 +83,7 @@ Added three local CSV/JSON adapters with editable mapping, real sample downloads
 ## Ontology slice D — controlled execution and appeals
 Added separate persisted ATR/response packets, independent packet review, manual outbox, execution proof, submission proof, independent acknowledgement, feedback and a separate appeal workflow. Closure now returns explicit blockers and cannot jump from approval to closed. Exact proposal/evidence hashes bind the packet and execution. Added custody/reviewer/authority/appellate/auditor demo identities without production claims. Typecheck and 37 service tests pass. Browser journey updated to include all proof gates; stable focused verification running. Remaining: richer typed case Chat, full evidence checklist/conflict UI, source-state polish, final acceptance report and full regression.
 
+
+## Ontology slice F — typed case tools
+Added persistent case/global conversations with scoped retrieval, actual verified-source excerpts, staged task/intake/follow-up/draft/review/closure commands and explicit confirmation. Confirmed tools reuse the same state-level action functions as Work; draft + Work association commits atomically. Replays do not duplicate versions; stale confirmations receive 409. The root composer routes grievance commands to the case backend and case Chat/Work switches preserve case context. Typecheck and 39 service tests pass. Execution/closure, member controls and three-source import browser journeys passed before this slice. Typed-agent browser checks and independent appeal branch are next.
+

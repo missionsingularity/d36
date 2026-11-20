@@ -1,0 +1,10 @@
+import {NextRequest,NextResponse} from 'next/server';
+import {readStore,transaction,id,StoreBusyError} from '@/lib/store';
+import {ensureGrievances} from '@/lib/grievances/service';
+import {grievanceActor} from '@/lib/grievances/session';
+import {GrievanceError} from '@/lib/grievances/permissions';
+import {agentMessage,confirmAgent,readAgentThread} from '@/lib/grievances/agent';
+export const runtime='nodejs';export const dynamic='force-dynamic';
+function error(e:unknown){const status=e instanceof GrievanceError||e instanceof StoreBusyError?e.status:400,message=e instanceof Error?e.message:'Case chat failed';return NextResponse.json({error:message,message,code:status===403?'FORBIDDEN':status===409?'CONFLICT':'VALIDATION',blockers:e instanceof GrievanceError?e.blockers:undefined,correlationId:id()},{status})}
+export async function GET(req:NextRequest){try{transaction(s=>ensureGrievances(s));const actor=grievanceActor(req),g=readStore().grievances!,q=req.nextUrl.searchParams;return NextResponse.json({thread:readAgentThread(g,actor,q.get('threadId')||undefined,q.get('caseId')||undefined),provider:'Offline — deterministic case tools',actor:actor.id},{headers:{'Cache-Control':'no-store'}})}catch(e){return error(e)}}
+export async function POST(req:NextRequest){try{const origin=req.headers.get('origin');if(origin&&new URL(origin).host!==req.headers.get('host'))throw new GrievanceError('Cross-origin action denied.',403);const raw=await req.text();if(raw.length>100000)throw new GrievanceError('Message is too large.',413);const b=JSON.parse(raw);transaction(s=>ensureGrievances(s));const actor=grievanceActor(req);if(b.type==='confirm'){if(typeof b.threadId!=='string'||typeof b.proposalId!=='string')throw new GrievanceError('Choose a saved proposal.');return NextResponse.json(confirmAgent(actor,b.threadId,b.proposalId,b.edits||{}))}if(b.type!=='message')throw new GrievanceError('Unknown chat operation.');return NextResponse.json({thread:await agentMessage(actor,b.text,b.caseId,b.threadId,b.newThread===true)})}catch(e){return error(e)}}

@@ -1,3 +1,4 @@
+import type {Store} from '../types';
 import {hash,id,now,transaction} from '../store';
 import type {GrievanceCase,GrievanceState,Persona} from './types';
 import {authorize,GrievanceError} from './permissions';
@@ -13,7 +14,7 @@ export function processReminders(g:GrievanceState,at=now()){
  for(const c of g.cases){if(['Closed','Voided'].includes(c.status))continue;const queue=ensureFollowUps(c);for(const f of queue.items){if(f.status!=='Open'||f.due>today)continue;if(f.lastReminder&&Date.parse(today)-Date.parse(f.lastReminder)<f.reminderDays*86400000)continue;const kind=today>=f.escalate?'Escalated':'Due';queue.reminders.push({id:id(),followUpId:f.id,at,recipient:kind==='Escalated'?'supervisor':f.owner,kind,externalSent:false});f.lastReminder=today;c.revision++;event(c,{id:'system-reminder',name:'Local reminder check',role:'viewer',departments:[],districts:[],member:false},'Internal reminder',`${kind}: ${f.item}; recipient ${kind==='Escalated'?'supervisor':f.owner}. No external message sent.`);count++}}
  return count;
 }
-export function operateFollowUp(p:Persona,caseId:string,b:Record<string,unknown>){return transaction(s=>{
+export function applyFollowUp(s:Store,p:Persona,caseId:string,b:Record<string,unknown>){
  const g=ensureGrievances(s),c=getCase(g,caseId,p),queue=ensureFollowUps(c),action=text(b.action,'Action',50);authorize(c,p,action);
  const key=b.requestKey?text(b.requestKey,'Request key',100):'',fingerprint=hash(JSON.stringify({...b,revision:undefined,requestKey:undefined}));if(key&&queue.keys[key]){if(queue.keys[key]!==fingerprint)throw new GrievanceError('Request key was already used for a different action.',409);return {case:c,replayed:true}}
  if(b.revision!==c.revision)throw new GrievanceError('Case changed. Refresh before saving.',409);let detail='';
@@ -29,4 +30,5 @@ export function operateFollowUp(p:Persona,caseId:string,b:Record<string,unknown>
   const attachment=c.attachments.find(a=>a.id===b.attachmentId&&a.verifiedBy);if(!attachment)throw new GrievanceError('Choose independently verified reply evidence.');f.response={attachmentId:attachment.id,reference:text(b.reference,'Reply reference',200),actor:p.id,at:now()};f.status='Resolved';const task=c.tasks.find(t=>t.id===f.taskId);if(task){task.proof=attachment.id;task.completedAt=now()}detail=`Reply to ${f.item}; ${f.response.reference}; verified original ${attachment.id}. Only this follow-up dependency was released.`;
  }else throw new GrievanceError('Unknown follow-up action.');
  if(key)queue.keys[key]=fingerprint;c.revision++;event(c,p,action,detail);syncOntology(c,p);return {case:c};
-})}
+}
+export function operateFollowUp(p:Persona,caseId:string,b:Record<string,unknown>){return transaction(s=>applyFollowUp(s,p,caseId,b))}

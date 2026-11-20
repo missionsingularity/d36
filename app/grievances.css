@@ -7,3 +7,6 @@
 
 .gr-ontology{padding:8px 0 22px;border-bottom:1px solid var(--border);margin-bottom:18px}.gr-case-members{display:flex;align-items:center;gap:6px;margin:10px 0}.gr-case-members .avatar{font-size:12px;width:36px;height:36px;min-height:36px}.gr-registration{font-size:12px;color:var(--muted)}.gr-relation{display:grid;grid-template-columns:minmax(0,1fr) 160px minmax(0,1fr) 85px;gap:14px;padding:12px 0;border-bottom:1px solid var(--border);font-size:12px}.gr-relation small{display:block;overflow-wrap:anywhere;color:var(--muted)}.gr-ontology details{margin:12px 0}.gr-ontology summary{cursor:pointer;padding:8px 0}@media(max-width:650px){.gr-relation{grid-template-columns:1fr}.gr-case-members{flex-wrap:wrap}}
 
+
+.gr-agent{max-width:1100px}.gr-agent-user{margin:22px 0 12px 10%;padding:14px 18px;background:var(--panel);border-radius:10px}.gr-agent-proposal{border-left:3px solid var(--strong);padding:12px 18px;margin:15px 0}.gr-param{display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}.gr-param span{max-height:240px;overflow:auto}.gr-agent-composer{padding:20px 0}.gr-citation{font-size:12px;margin:6px 6px 6px 0}@media(max-width:650px){.gr-param{grid-template-columns:1fr}}
+
