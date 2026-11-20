@@ -15,3 +15,6 @@ MASTER_CODEX_PROMPT.md
 *.tsbuildinfo
 brahmagpt_grievance_codex_pack/
 BrahmaGPT_D36_Grievance_Ontology_Codex_Prompt.md
+
+BrahmaGPT_D36_Customize_Ontology_Codex_Master_Prompt.md
+BrahmaGPT_D36_Customize_Ontology_Demo_Master_Prompt_v2.md
