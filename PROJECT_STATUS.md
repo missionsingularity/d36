@@ -1,6 +1,6 @@
 ﻿## Current checkpoint — 21 November 2026
 
-This section supersedes the historical entries below. Official remote is `https://github.com/missionsingularity/d36.git`, branch `main`. Published checkpoint `62cc07d` pushed successfully without rewriting history. The final test fixes and status updates are being saved as a follow-up checkpoint.
+This section supersedes the historical entries below. Official remote is `https://github.com/missionsingularity/d36.git`, branch `main`. The completed test fixes and status reports are published on `main`; run `git log -1` for the latest checkpoint. No history was rewritten.
 
 The existing Next.js app, persistent SQLite store and ten deterministic workflows are preserved. The five-scene pension case, grievance lifecycle, local synthetic imports, role-scoped records, evidence, approvals, appeals, tasks, Chat/Work, documents and exports are connected. All ten workflows have browser-tested results and five-format downloads. The application uses synthetic data; local personas, approvals and dispatch are demonstrations and no government system or external AI is connected.
 

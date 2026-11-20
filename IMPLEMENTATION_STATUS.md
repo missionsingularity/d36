@@ -1,6 +1,6 @@
 # Customize v2 implementation status
 
-Updated 21 November 2026. Official `origin` is `https://github.com/missionsingularity/d36.git`, branch `main`. Latest checkpoint `62cc07d` was pushed successfully. Earlier milestones below are historical.
+Updated 21 November 2026. Official `origin` is `https://github.com/missionsingularity/d36.git`, branch `main`. The completed implementation, test fixes and status reports are published on `main`; run `git log -1` for the latest checkpoint. Earlier milestones below are historical.
 
 ## Current application
 
