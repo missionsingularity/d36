@@ -87,3 +87,7 @@ Added separate persisted ATR/response packets, independent packet review, manual
 ## Ontology slice F — typed case tools
 Added persistent case/global conversations with scoped retrieval, actual verified-source excerpts, staged task/intake/follow-up/draft/review/closure commands and explicit confirmation. Confirmed tools reuse the same state-level action functions as Work; draft + Work association commits atomically. Replays do not duplicate versions; stale confirmations receive 409. The root composer routes grievance commands to the case backend and case Chat/Work switches preserve case context. Typecheck and 39 service tests pass. Execution/closure, member controls and three-source import browser journeys passed before this slice. Typed-agent browser checks and independent appeal branch are next.
 
+
+## Ontology evidence and appeal checkpoint
+Added case-specific document requirements with recorded basis, not-applicable determinations, preserved source revisions, independent conflict review and exact-version approval request objects. Non-text PDFs now return no fabricated page quotation and show OCR required. Added authority delegation and specialist case grants. Historical imported disposal can be internally finalised only with verified source ATR, proof and completed appeals; it does not write back to the source. Typecheck and 42 service tests pass. Next: typed-agent/appeal browser journeys, final regression/build, reports and remaining UI integration.
+

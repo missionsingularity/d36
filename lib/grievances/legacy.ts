@@ -11,14 +11,14 @@ export type ExternalRecord={id:string;adapter:Adapter;externalId:string;departme
 export type ImportRow={row:number;state:'New'|'Duplicate'|'Update'|'Stale'|'Conflict'|'Quarantined';reason:string;values:Record<string,string>;recordId?:string;caseId?:string};
 export type LegacyState={records:ExternalRecord[];jobs:{id:string;adapter:Adapter;at:string;actor:string;fileHash:string;rows:ImportRow[];requestKey:string}[]};
 export const columns:Record<Adapter,string[]>={
- 'CPGRAMS sample':['external_id','received','title','narrative','official_status','source_updated_at','department','district','category','priority'],
+ 'CPGRAMS sample':['external_id','received','title','narrative','official_status','source_updated_at','department','district','category','priority','decision_actor','disposal_date','atr_reference'],
  'Kritagyata sample':['external_id','stage','source_updated_at','grievance_reference','department','district'],
  'eOffice sample':['external_id','stage','dispatch_reference','source_updated_at','grievance_reference','department','district']
 };
 export const ensureLegacy=(g:GrievanceState)=>g.legacy??={records:[],jobs:[]};
-function importer(p:Persona){if(!p.member||!['admin','supervisor'].includes(p.role))throw new GrievanceError('Demo admin or supervisor required for local imports.',403)}
+function importer(p:Persona){if(!p.member||!['admin','supervisor','integration'].includes(p.role))throw new GrievanceError('Demo admin or supervisor required for local imports.',403)}
 export function sampleFile(adapter:Adapter){const at='2026-11-20T08:00:00Z',rows:Record<Adapter,string[][]>={
- 'CPGRAMS sample':[['DEMO-GRV-0142','2026-11-01','Illustrative pension delay','Synthetic complaint; signed annexure missing','Pending',at,'Pension','Demo North','Pension delay','High'],['DEMO-GRV-0219','2026-02-01','Historical sample disposal','Synthetic historical case, preserved source status','Disposed','2026-03-10T08:00:00Z','Pension','Demo North','Other','Low']],
+ 'CPGRAMS sample':[['DEMO-GRV-0142','2026-11-01','Illustrative pension delay','Synthetic complaint; signed annexure missing','Pending',at,'Pension','Demo North','Pension delay','High','','',''],['DEMO-GRV-0219','2026-02-01','Historical sample disposal','Synthetic historical case, preserved source status','Disposed','2026-03-10T08:00:00Z','Pension','Demo North','Other','Low','approver','2026-03-10','DEMO-ATR-0219']],
  'Kritagyata sample':[['DEMO-PEN-142','Awaiting signed annexure',at,'DEMO-GRV-0142','Pension','Demo North']],
  'eOffice sample':[['DEMO-FILE-142','Draft noting','NOT-ISSUED',at,'DEMO-GRV-0142','Pension','Demo North']]
  };return csv([columns[adapter],...rows[adapter]])}

@@ -21,7 +21,7 @@ export async function extractOriginal(bytes:Buffer,extension:string):Promise<str
         const page=await document.getPage(number);
         const content=await page.getTextContent();
         const text=content.items.map(item=>'str' in item?item.str:'').join(' ');
-        pages.push(`Page ${number}\n${text}`);
+        if(text.trim())pages.push(`Page ${number}\n${text}`);
         size+=text.length;
       }
       return pages.join('\n\n').slice(0,50000);
