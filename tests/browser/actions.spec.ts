@@ -4,16 +4,16 @@ import {Document,Packer,Paragraph} from 'docx';
 async function start(page:Page,id:number){await page.goto('/customize');await page.getByTestId('workflow-'+id).click();await page.getByRole('button',{name:'Start demonstration'}).click();await expect(page).toHaveURL(/\/chat\//);await page.getByRole('button',{name:'Open in Work'}).click();await expect(page).toHaveURL(/\/work\//);return page.url()}
 async function persona(page:Page,role:string){await page.goto('/profile');await page.getByLabel('Demo persona').selectOption(role);await expect(page.getByLabel('Demo persona')).toHaveValue(role);await expect(page.locator('.toast')).toBeVisible()}
 test('scan correction, independent review and meeting chair confirmation',async({page})=>{
- const scan=await start(page,3);await page.getByRole('button',{name:'Correct uncertain figure'}).click();await page.getByLabel('Corrected service years').selectOption('18');await page.getByLabel('Reason and source inspection').fill('Inspected synthetic record; choose 18 for this demonstration.');await page.getByRole('button',{name:'Confirm and save'}).click();await expect(page.locator('dialog')).toHaveCount(0);
- await page.locator('.tabs').getByRole('button',{name:'Decisions'}).click();await page.getByRole('button',{name:'Request review',exact:true}).click();await expect(page.locator('.meta-line')).toContainText('Review requested');await persona(page,'reviewer');await page.goto(scan);await page.locator('.tabs').getByRole('button',{name:'Decisions'}).click();await page.getByRole('button',{name:'Approve version',exact:true}).click();await page.getByLabel('Determination / limitations acknowledged').fill('Independent review of corrected demo transcription.');await page.getByRole('button',{name:'Confirm and save'}).click();await expect(page.locator('.meta-line')).toContainText('Reviewed');
- await start(page,8);await page.getByRole('button',{name:'Confirm meeting assignment'}).click();await page.getByLabel('Confirmed officer name').fill('Arup (demo)');await page.getByRole('button',{name:'Confirm and save'}).click();await page.locator('.tabs').getByRole('button',{name:/Tasks/}).click();await expect(page.getByRole('button',{name:/Request signed annexure/})).toBeVisible();
+ const scan=await start(page,3);await page.getByRole('button',{name:'Correct uncertain figure'}).click();await page.getByLabel('Corrected service years').selectOption('18');await page.getByLabel('Reason for correction').fill('Inspected synthetic record; choose 18 for this demonstration.');await page.getByRole('button',{name:'Save'}).click();await expect(page.locator('dialog')).toHaveCount(0);
+ await page.locator('.tabs').getByRole('button',{name:'Decisions'}).click();await page.getByRole('button',{name:'Request review',exact:true}).click();await expect(page.locator('.meta-line')).toContainText('Review requested');await persona(page,'reviewer');await page.goto(scan);await page.locator('.tabs').getByRole('button',{name:'Decisions'}).click();await page.getByRole('button',{name:'Approve version',exact:true}).click();await page.getByLabel('Review comments').fill('Independent review of corrected demo transcription.');await page.getByRole('button',{name:'Save'}).click();await expect(page.locator('.meta-line')).toContainText('Reviewed');
+ await start(page,8);await page.getByRole('button',{name:'Confirm meeting assignment'}).click();await page.getByLabel('Confirmed officer name').fill('Arup (demo)');await page.getByRole('button',{name:'Save'}).click();await page.locator('.tabs').getByRole('button',{name:/Tasks/}).click();await expect(page.getByRole('button',{name:/Request signed annexure/})).toBeVisible();
 });
 test('task proof guard, private scenario, outreach approval and amendment pause',async({page})=>{
- const plan=await start(page,5);await page.getByRole('button',{name:'Explore a three-day review delay'}).click();await expect(page.getByRole('columnheader',{name:'Private scenario'})).toBeVisible();await page.locator('.tabs').getByRole('button',{name:/Tasks/}).click();await page.getByRole('button',{name:/^Verify annexure/}).click();await page.getByLabel('Proposed status').selectOption('Completed (unverified)');await page.getByRole('button',{name:'Confirm and save'}).click();await expect(page.getByRole('row').filter({hasText:'Completed (unverified)'})).toContainText('Verify annexure');
+ const plan=await start(page,5);await page.getByRole('button',{name:'Explore a three-day review delay'}).click();await expect(page.getByRole('columnheader',{name:'Private scenario'})).toBeVisible();await page.locator('.tabs').getByRole('button',{name:/Tasks/}).click();await page.getByRole('button',{name:/^Verify annexure/}).click();await page.getByLabel('Proposed status').selectOption('Completed (unverified)');await page.getByRole('button',{name:'Save'}).click();await expect(page.getByRole('row').filter({hasText:'Completed (unverified)'})).toContainText('Verify annexure');
  await page.goto('/tasks');await expect(page.getByRole('region',{name:'Daily progress'})).toContainText('Awaiting proof');await page.getByRole('textbox',{name:'Search tasks'}).fill('Verify annexure');await page.getByLabel('Task priority').selectOption('High');await expect(page.getByRole('button',{name:/^Verify annexure/})).toBeVisible();await expect(page.getByRole('button',{name:/^Prepare draft/})).toHaveCount(0);await page.goto(plan);await page.locator('.tabs').getByRole('button',{name:/Tasks/}).click();
- await page.getByRole('button',{name:/Prepare draft Depends/}).click();await page.getByLabel('Proposed status').selectOption('In progress');await page.getByRole('button',{name:'Confirm and save'}).click();await expect(page.locator('dialog [role=alert]')).toContainText('Prerequisite');await page.getByRole('button',{name:'Close dialog'}).click();
- const campaign=await start(page,10);await page.locator('.tabs').getByRole('button',{name:'Decisions'}).click();await page.getByRole('button',{name:'Request review',exact:true}).click();await expect(page.locator('.meta-line')).toContainText('Review requested');await persona(page,'reviewer');await page.goto(campaign);await page.locator('.tabs').getByRole('button',{name:'Decisions'}).click();await page.getByRole('button',{name:'Approve version',exact:true}).click();await page.getByLabel('Determination / limitations acknowledged').fill('Reviewed all three translations and synthetic consent basis.');await page.getByRole('button',{name:'Confirm and save'}).click();await expect(page.locator('.meta-line')).toContainText('Reviewed');await page.locator('.tabs').getByRole('button',{name:'Overview'}).click();await page.getByRole('button',{name:'Simulate approved outreach'}).click();await page.getByRole('button',{name:'Confirm and save'}).click();await expect(page.getByText('Opt-out · excluded',{exact:true})).toBeVisible();await page.screenshot({path:'test-results/outreach-light.png'});
- await start(page,7);await page.getByRole('button',{name:'Create impact review queue'}).click();await page.getByRole('button',{name:'Confirm and save'}).click();await expect(page.locator('.page-heading')).toContainText('Impact queue prepared');await page.goto(campaign);await expect(page.locator('.page-heading')).toContainText('Source review required');await page.goto(plan);await expect(page.getByRole('columnheader',{name:'Private scenario'})).toBeVisible();
+ await page.getByRole('button',{name:/Prepare draft Depends/}).click();await page.getByLabel('Proposed status').selectOption('In progress');await page.getByRole('button',{name:'Save'}).click();await expect(page.locator('dialog [role=alert]')).toContainText('Prerequisite');await page.getByRole('button',{name:'Close dialog'}).click();
+ const campaign=await start(page,10);await page.locator('.tabs').getByRole('button',{name:'Decisions'}).click();await page.getByRole('button',{name:'Request review',exact:true}).click();await expect(page.locator('.meta-line')).toContainText('Review requested');await persona(page,'reviewer');await page.goto(campaign);await page.locator('.tabs').getByRole('button',{name:'Decisions'}).click();await page.getByRole('button',{name:'Approve version',exact:true}).click();await page.getByLabel('Review comments').fill('Reviewed all three translations and synthetic consent basis.');await page.getByRole('button',{name:'Save'}).click();await expect(page.locator('.meta-line')).toContainText('Reviewed');await page.locator('.tabs').getByRole('button',{name:'Overview'}).click();await page.getByRole('button',{name:'Simulate approved outreach'}).click();await page.getByRole('button',{name:'Save'}).click();await expect(page.getByText('Opt-out · excluded',{exact:true})).toBeVisible();await page.screenshot({path:'test-results/outreach-light.png'});
+ await start(page,7);await page.getByRole('button',{name:'Create impact review queue'}).click();await page.getByRole('button',{name:'Save'}).click();await expect(page.locator('.page-heading')).toContainText('Impact queue prepared');await page.goto(campaign);await expect(page.locator('.page-heading')).toContainText('Source review required');await page.goto(plan);await expect(page.getByRole('columnheader',{name:'Private scenario'})).toBeVisible();
 });
 test('API permissions, hostile origin, real uploaded originals and downloadable Office outputs',async({request})=>{
  const denied=await request.post('/api/demo',{headers:{origin:'https://untrusted.invalid'},data:{type:'launch',workflowId:1}});expect(denied.status()).toBe(403);
@@ -34,7 +34,7 @@ test('RTI review return and reopened office-note review block handoff',async({pa
     await page.getByRole('button',{name:'Request review',exact:true}).click();
     await expect(page.locator('.meta-line')).toContainText('Review requested');
   };
-  const handoff=()=>page.getByRole('button',{name:'Prepare manual handoff'}).click();
+  const handoff=()=>page.getByRole('button',{name:'Prepare handoff'}).click();
   await decisions();
   await handoff();
   await expect(page.locator('.error-banner')).toContainText('Review the current version');
@@ -42,9 +42,9 @@ test('RTI review return and reopened office-note review block handoff',async({pa
   await persona(page,'reviewer');
   await page.goto(rti);
   await decisions();
-  await page.getByRole('button',{name:'Return / clarify'}).click();
+  await page.getByRole('button',{name:'Return'}).click();
   await page.getByLabel('Required changes').fill('Resolve the missing RTI evidence first.');
-  await page.getByRole('button',{name:'Confirm and save'}).click();
+  await page.getByRole('button',{name:'Save'}).click();
   await expect(page.locator('.meta-line')).toContainText('Returned');
   await handoff();
   await expect(page.locator('.error-banner')).toContainText('Review the current version');
@@ -53,8 +53,8 @@ test('RTI review return and reopened office-note review block handoff',async({pa
   await decisions();
   await requestReview();
   await page.getByRole('button',{name:'Approve version',exact:true}).click();
-  await page.getByLabel('Determination / limitations acknowledged').fill('Reviewed for local simulation.');
-  await page.getByRole('button',{name:'Confirm and save'}).click();
+  await page.getByLabel('Review comments').fill('Reviewed for local simulation.');
+  await page.getByRole('button',{name:'Save'}).click();
   await expect(page.locator('.meta-line')).toContainText('Reviewed');
   await handoff();
   await expect(page.getByText(/manual package prepared/)).toBeVisible();
@@ -80,13 +80,13 @@ test('selected historical date and reviewer-applied task dates persist through t
   await expect(row).toContainText('2026-11-21');
   await expect(row).toContainText('2026-11-24');
   await page.getByRole('button',{name:'Confirm scenario dates'}).click();
-  await page.getByRole('button',{name:'Confirm and save'}).click();
+  await page.getByRole('button',{name:'Save'}).click();
   await expect(page.locator('dialog [role=alert]')).toContainText('Reviewer and scenario required');
   await page.keyboard.press('Escape');
   await persona(page,'reviewer');
   await page.goto(plan);
   await page.getByRole('button',{name:'Confirm scenario dates'}).click();
-  await page.getByRole('button',{name:'Confirm and save'}).click();
+  await page.getByRole('button',{name:'Save'}).click();
   await expect(page.getByRole('columnheader',{name:'Private scenario'})).toHaveCount(0);
   await page.reload();
   await page.locator('.tabs').getByRole('button',{name:/Tasks/}).click();

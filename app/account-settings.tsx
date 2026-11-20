@@ -18,13 +18,13 @@ export default function AccountSettings({section,pending,role,settings,sources,p
     finally{setSaving(false)}
   }
   if(section==='Permissions')return <section className="settings-card">
-    <h2>Permissions</h2><p>Your active persona is <strong>{role}</strong>. Source restrictions also apply to search, citations and downloads.</p>
-    <div className="table-wrap"><table><thead><tr><th>Capability</th><th>Officer</th><th>Reviewer</th><th>Guest</th></tr></thead><tbody>
+    <h2>Permissions</h2><p>Your current role is <strong>{role}</strong>. Source restrictions also apply to search, citations and downloads.</p>
+    <div className="table-wrap"><table><thead><tr><th>Action</th><th>Officer</th><th>Reviewer</th><th>Guest</th></tr></thead><tbody>
       {[['Read permitted records','Yes','Yes','Yes'],['Create and edit work','Yes','Yes','—'],['Approve and verify','—','Yes','—'],['Manage source restrictions','—','Yes','—']].map(row=><tr key={row[0]}>{row.map((cell,i)=><td key={i}>{cell}</td>)}</tr>)}
     </tbody></table></div>
     <h3 style={{marginTop:24}}>Source access</h3>
-    {permissions.canManage&&<label className="field">Inspect persona<select value={target} onChange={e=>setTarget(e.target.value)}><option value="guest">Guest</option><option value="officer">Officer</option></select></label>}
-    <p className="muted small">{permissions.canManage?'Restrict access or remove a previous restriction. Removing a restriction restores the base role permissions.':'Your accessible source list is shown below. The reviewer manages additional restrictions.'}</p>
+    {permissions.canManage&&<label className="field">Choose role<select value={target} onChange={e=>setTarget(e.target.value)}><option value="guest">Guest</option><option value="officer">Officer</option></select></label>}
+    <p className="muted small">{permissions.canManage?'Choose which sources this role can open. Restoring access applies the usual role permissions.':'These are the sources you can open. A reviewer can change access.'}</p>
     {sources.map(source=>{
       const restricted=permissions.revoked.includes(target+':'+source.id);
       return <div className="list-row" key={source.id}><span>{source.title}<small style={{display:'block'}}>{source.id}</small></span>
@@ -36,7 +36,7 @@ export default function AccountSettings({section,pending,role,settings,sources,p
   const account=section==='Account';
   return <section className="settings-card">
     <h3>{account?'Account details':'Workspace preferences'}</h3>
-    {account&&<p className="muted">Profile details belong to the active demonstration persona. Contact fields are optional.</p>}
+    {account&&<p className="muted">These details are saved for your current demo role. Contact details are optional.</p>}
     <form key={role+section+JSON.stringify(settings)} onSubmit={e=>{
       e.preventDefault();
       const values=Object.fromEntries(new FormData(e.currentTarget));

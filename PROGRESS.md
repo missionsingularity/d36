@@ -44,3 +44,7 @@ Final clean regression: 30 Chromium tests passed in 4.3 minutes. This includes t
 GitHub access is restored. The normal fast-forward push to missionsingularity/d36/main succeeded through e94980b, publishing a5d2e4f, d2d7471, 16ecc2c, dbd3328 and e94980b. This report is saved in the subsequent checkpoint.
 
 The full master-prompt scope is still incomplete. Next implementation priority is grievance CRUD/inbox and a guarded lifecycle with distinct Approver identity, followed by scoped project membership authorization and custom task CRUD. SQLite migration, remote provider adapter, notebooks and reversible legacy import remain pending. Existing JSON records and all prior functionality are preserved.
+
+## Plain-language interface, 20 November 2026
+Shortened navigation, dialog labels, profile and permission explanations, conversation guidance and all ten task descriptions. Removed overlapping labels such as Meetings & minutes and Confirm and save. Exact source passages and formal output content are preserved. TypeScript and 23 service tests pass. Browser regression is in progress; one citation-modal check needs a focused rerun after edits made during the test run. Existing tsconfig.json working changes are preserved.
+

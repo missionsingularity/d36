@@ -5,7 +5,7 @@ test('project members are added, persisted and removed with owner protection',as
   for(const id of ['reviewer','coordinator','viewer']){
     await card.getByRole('button',{name:'Add member',exact:true}).click();
     await page.getByLabel('Member',{exact:true}).selectOption(id);
-    await page.getByRole('button',{name:'Confirm and save'}).click();
+    await page.getByRole('button',{name:'Save'}).click();
     await expect(page.locator('dialog')).toHaveCount(0);
   }
   await page.reload();

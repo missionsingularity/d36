@@ -36,7 +36,7 @@ test('confirmation stays locked during saving and submits once',async({page})=>{
   await expect(page.getByLabel('Display name')).toHaveValue('Demo Reviewer');
   await page.locator('.view-switch').getByRole('button',{name:'Work',exact:true}).click();
   await page.getByRole('button',{name:'Approve version',exact:true}).click();
-  await page.getByLabel('Determination / limitations acknowledged').fill('Reviewed in flow-control test.');
+  await page.getByLabel('Review comments').fill('Reviewed in flow-control test.');
   let count=0;
   await page.route('**/api/demo',async route=>{
     if(route.request().method()==='POST'&&route.request().postDataJSON().type==='approve'){
@@ -45,8 +45,8 @@ test('confirmation stays locked during saving and submits once',async({page})=>{
     }
     await route.continue();
   });
-  await page.getByRole('button',{name:'Confirm and save'}).click();
-  await expect(page.getByRole('button',{name:'Confirm and save'})).toBeDisabled();
+  await page.getByRole('button',{name:'Save'}).click();
+  await expect(page.getByRole('button',{name:'Save'})).toBeDisabled();
   await expect(page.getByRole('button',{name:'Close dialog'})).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(page.locator('dialog')).toBeVisible();

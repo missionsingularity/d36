@@ -19,7 +19,7 @@ test('New Chat, citation preview, notifications and local sharing stay connected
   await page.getByRole('button', {name:'Share',exact:true}).click();
   await page.getByLabel('Recipient access').selectOption('reviewer');
   const response = page.waitForResponse(r => r.request().method()==='POST' && r.url().endsWith('/api/demo'));
-  await page.getByRole('button', {name:'Confirm and save'}).click();
+  await page.getByRole('button', {name:'Save'}).click();
   const shared = await response;
   expect(shared.ok()).toBeTruthy();
   expect((await shared.json()).url).toBe('/chat/'+record.split('/').pop());
