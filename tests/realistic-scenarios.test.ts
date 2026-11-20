@@ -1,0 +1,16 @@
+import test,{beforeEach,afterEach} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {PDFDocument} from 'pdf-lib';
+import {seedDemoWorld} from '../lib/demo-world';
+import {executeScenario} from '../lib/realistic-scenarios';
+import {readStore} from '../lib/store';
+import {exportRun} from '../lib/exports';
+import {act} from '../lib/engine';
+import {saveAttachment} from '../lib/grievances/io';
+let dir:string,previous:string|undefined;
+beforeEach(async()=>{previous=process.env.BRAHMA_DATA_DIR;dir=fs.mkdtempSync(path.join(os.tmpdir(),'brahma-scenarios-'));process.env.BRAHMA_DATA_DIR=dir;await seedDemoWorld()});afterEach(()=>{if(previous===undefined)delete process.env.BRAHMA_DATA_DIR;else process.env.BRAHMA_DATA_DIR=previous;fs.rmSync(dir,{recursive:true,force:true})});const p=()=>readStore().grievances!.personas.find(p=>p.id==='DEMO-U-DA')!;
+test('nine realistic scenarios create persistent source-backed results and five actual output formats',async()=>{for(const workflowId of [1,2,3,5,6,7,8,9,10]){const r=executeScenario(p(),'officer',workflowId);assert.equal(r.scenarioVersion,1);assert.ok(r.findings.length);assert.ok(readStore().runs.some(x=>x.id===r.id));if(workflowId!==10)assert.ok(r.evidenceReferences!.length);for(const format of ['pdf','docx','xlsx','pptx','txt']){const file=await exportRun(r,format);assert.ok(file.buffer.length>100);if(format==='pdf')assert.ok((await PDFDocument.load(file.buffer)).getPageCount());if(format==='txt')assert.match(file.buffer.toString(),/DEMO/)}if(workflowId===5)assert.equal(r.tasks.length,8);if(workflowId===9)assert.match(r.findings[2].text,/Missing/)}assert.throws(()=>executeScenario(readStore().grievances!.personas.find(p=>p.id==='outside')!,'officer',1),(e:unknown)=>(e as {status:number}).status===403)});
+test('historical date and changed source alter results; unverified sources cannot be approved',()=>{const before=executeScenario(p(),'officer',2,'2026-06-20'),after=executeScenario(p(),'officer',2,'2026-08-01');assert.match(before.findings[1].text,/Excluded/);assert.match(after.findings[1].text,/Candidate/);const old=executeScenario(p(),'officer',1);assert.throws(()=>act(old.id,{type:'request-review'},'officer'),/Verify every cited/);const source=readStore().demoWorld!.documents.find(d=>d.id==='DEMO-CIR-002-pdf')!,c=readStore().grievances!.cases.find(c=>c.id===source.caseId)!;saveAttachment(p(),c.id,c.revision,{name:'DEMO-CIR-002-revised.txt',mime:'text/plain',bytes:Buffer.from('DEMO revised clause: retain the original and request a separately verified copy.'),previousId:source.attachmentId});const changed=executeScenario(p(),'officer',1);assert.notEqual(changed.versions[0].hash,old.versions[0].hash);assert.match(changed.findings[1].text,/revised clause/);assert.equal(changed.evidenceReferences![1].page,0)});
