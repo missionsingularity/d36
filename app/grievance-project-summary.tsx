@@ -1,0 +1,3 @@
+'use client';
+import {useEffect,useState} from 'react';
+export default function GrievanceProjectSummary(){const [summary,setSummary]=useState<{active:number;closed:number}>(),[latest,setLatest]=useState('');useEffect(()=>{let active=true;fetch('/api/grievances',{cache:'no-store'}).then(async r=>{if(!r.ok)return;const data=await r.json();if(active){setSummary(data.summary);setLatest(data.recent[0]?.at||'')}}).catch(()=>{});return()=>{active=false}},[]);return <p className="muted small">{summary?`${summary.active} open cases · ${summary.closed} closed`:'Case counts loading…'}{latest?' · Updated '+new Date(latest).toLocaleDateString('en-GB'):''}</p>}

@@ -55,3 +55,7 @@ Plain-language verification complete: typecheck and 23 service tests pass. Brows
 ## Grievance slice 1 — domain and API
 Read the full grievance directive. Added backward-compatible grievance state, seeded synthetic cases, scoped demo roles, validated lifecycle, versioned proposals and evidence, audit hash chain, CSV/PDF exports and atomic legacy import/reversal. Seven independent domain tests and typecheck pass. UI integration and HTTP/browser tests are next. Existing tsconfig.json changes preserved. This slice is partial until the interface and journeys are verified.
 
+
+## Grievance slice 2 — connected case workspace
+Projects now opens the persisted grievance dashboard and register. Added intake/drafts, seven dossier tabs plus scoped local chat, role controls, evidence inspection, versioned decisions, closure/reopening, tasks, reports, policy/team settings and fixed-format CSV import. Initial Chromium run passed all three new journeys, including complete lifecycle, HTTP denial/import and viewport checks. Tightened theme test to assert actual persisted theme; a full rerun is next. Work links use case-scoped exports; generic chat excludes case data. Typecheck and all 30 combined service tests pass. No unrelated tsconfig.json changes staged.
+

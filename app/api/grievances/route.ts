@@ -20,7 +20,7 @@ function download(value:string|Uint8Array,mime:string,filename:string){return ne
 export async function GET(req:NextRequest){try{
  transaction(s=>ensureGrievances(s));const actor=grievanceActor(req),s=readStore(),g=s.grievances!,q=req.nextUrl.searchParams,caseId=q.get('id'),kind=q.get('kind');
  if(caseId){const c=getCase(g,caseId,actor);
-  if(kind==='attachment'){const a=c.attachments.find(a=>a.id===q.get('attachment'));if(!a||! /^[a-f0-9]{64}$/.test(a.hash))throw new GrievanceError('Evidence not found.',404);const bytes=fs.readFileSync(path.join(dataDir(),'grievance-evidence',a.hash));return download(new Uint8Array(bytes),a.mime,a.name.replace(/[^a-zA-Z0-9._-]/g,'_'))}
+  if(kind==='attachment'||kind==='preview'){const a=c.attachments.find(a=>a.id===q.get('attachment'));if(!a||! /^[a-f0-9]{64}$/.test(a.hash))throw new GrievanceError('Evidence not found.',404);const bytes=fs.readFileSync(path.join(dataDir(),'grievance-evidence',a.hash));if(kind==='preview'){const {extractOriginal}=await import('@/lib/extraction');let content='';try{content=await extractOriginal(bytes,a.name.split('.').pop()!.toLowerCase())}catch{content='Text preview unavailable. Download the original for inspection.'}return NextResponse.json({name:a.name,text:content||'No readable text found. Inspect the original.',hash:a.hash},{headers:{'Cache-Control':'no-store'}})}return download(new Uint8Array(bytes),a.mime,a.name.replace(/[^a-zA-Z0-9._-]/g,'_'))}
   if(kind==='pdf'||kind==='ack')return download(await casePdf(c,kind==='ack'),'application/pdf',c.id+(kind==='ack'?'-acknowledgement':'-history')+'.pdf');
   if(kind==='history')return download(historyText(c),'text/plain; charset=utf-8',c.id+'-history.txt');
   return NextResponse.json({case:c,actor},{headers:{'Cache-Control':'no-store'}})
@@ -32,11 +32,21 @@ export async function GET(req:NextRequest){try{
  return NextResponse.json({actor,people:g.personas.filter(p=>actor.role==='admin'||(p.member&&p.departments.some(d=>actor.departments.includes(d)))).map(p=>({...p})),cases:filtered.slice((page-1)*size,page*size),total:filtered.length,page,size,summary:report(visible),myCases:visible.filter(c=>c.owner===actor.id&&!['Closed','Voided'].includes(c.status)),attention:visible.filter(c=>!c.owner&&!['Draft','Closed','Voided'].includes(c.status)),recent:visible.flatMap(c=>c.events.map(e=>({...e,caseId:c.id,title:c.title}))).sort((a,b)=>b.at.localeCompare(a.at)).slice(0,12),policies:g.policies,categories:g.categories,batches:actor.role==='admin'?g.batches:[],settingsHistory:actor.role==='admin'?g.settingsHistory:[]},{headers:{'Cache-Control':'no-store'}})
  }catch(e){return error(e)}}
 export async function POST(req:NextRequest){try{
- origin(req);transaction(s=>ensureGrievances(s));const actor=grievanceActor(req);
+ origin(req);if(Number(req.headers.get('content-length')||0)>6*1024*1024)throw new GrievanceError('Request too large.',413);transaction(s=>ensureGrievances(s));const actor=grievanceActor(req);
  if(req.headers.get('content-type')?.includes('multipart/form-data')){const f=await req.formData(),file=f.get('file');if(!(file instanceof File)||file.size>5*1024*1024)throw new GrievanceError('Choose an evidence file up to 5 MB.');return NextResponse.json({case:saveAttachment(actor,text(f.get('id'),'Case ID',80),Number(f.get('revision')),{name:file.name,mime:file.type,bytes:Buffer.from(await file.arrayBuffer())})})}
  const raw=await req.text();if(raw.length>150000)throw new GrievanceError('Request too large.',413);const b=JSON.parse(raw);
  if(b.action==='persona'){const person=readStore().grievances!.personas.find(p=>p.id===b.persona);if(!person)throw new GrievanceError('Choose a known demo persona.');transaction(s=>{s.sessions![req.cookies.get('brahma-session')!.value].grievancePersona=person.id});return NextResponse.json({ok:true})}
  if(b.action==='create')return NextResponse.json({case:createCase(actor,b,b.register===true)},{status:201});
+ if(b.action==='ask'){
+  const g=readStore().grievances!,c=getCase(g,text(b.id,'Case ID',80),actor),question=text(b.question,'Question',200);
+  let answer='';
+  if(question==='Summarise the chronology')answer=c.events.map(e=>`${e.at}: ${e.action} by ${e.actor}. ${e.prior} → ${e.next}.`).join('\n');
+  else if(question==='Which attachments are missing?')answer=c.requests.filter(r=>!r.acknowledgedAt).map(r=>`${r.item}; requested from ${r.owner} on ${r.at}`).join('\n')||'No outstanding document requests are recorded. This does not establish that the file is complete.';
+  else if(question==='List my overdue cases')answer=g.cases.filter(x=>canReadCase(x,actor)&&x.owner===actor.id&&x.due<now().slice(0,10)&&!['Closed','Draft','Voided'].includes(x.status)).map(x=>`${x.id}: ${x.title}; due ${x.due}`).join('\n')||'No overdue cases assigned to this persona.';
+  else if(['Draft the next action','Prepare a response for review'].includes(question))answer=`LOCAL TEMPLATE — NOT APPROVED\n${c.id}: ${c.title}\nReference: ${c.source} ${c.reference}, received ${c.received}.\nCase description: ${c.narrative}\nCurrent state: ${c.status}. Responsible officer: ${c.owner||'Unassigned'}.\nEvidence: ${c.attachments.map(a=>a.name+' ('+(a.verifiedBy?'verified':'unverified')+')').join('; ')||'No evidence attached'}.\nOutstanding requests: ${c.requests.filter(r=>!r.acknowledgedAt).map(r=>r.item).join('; ')||'None recorded'}.\nRecommendation: inspect the original records, address missing evidence, and submit an exact proposed resolution for independent review. No decision or notification is issued by this template.`;
+  else throw new GrievanceError('Choose one of the supported case questions.');
+  return NextResponse.json({text:answer,draft:['Draft the next action','Prepare a response for review'].includes(question),citations:c.attachments.map(a=>({id:a.id,name:a.name}))});
+ }
  if(b.action==='preview-import'){
   const rows=previewImport(actor,text(b.csv,'CSV',100000));const {makeCase}=await import('@/lib/grievances/service');const sandbox=structuredClone(readStore().grievances!);for(const row of rows){if(!row.error)try{makeCase(sandbox,actor,{...row.values,source:'Legacy CSV',contact:'SYNTHETIC-IMPORT'},true)}catch(e){row.error=e instanceof Error?e.message:'Invalid row'}}return NextResponse.json({rows});
  }

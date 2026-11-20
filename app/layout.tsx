@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './grievances.css';
 import {ThemeProvider} from './theme-provider';
 export const metadata: Metadata = { title: 'BrahmaGPT — Government workspace', description: 'An illustrative government work demonstrator' };
 export default function RootLayout({children}:{children:React.ReactNode}) {
