@@ -71,3 +71,7 @@ Official main/origin preserved. Read the complete available root ontology prompt
 ## Ontology slice A/B checkpoint
 Pack appeared after retry. The pack master hash matches the fully read root prompt; read its supporting workflow specification and prior master and inspected all three screenshots. Added backward-compatible typed case/issues/document-version/task/draft/user relationships, scoped duplicate suggestions with human review, case member roles and lead protection, explicit internal/non-official label, structured error envelopes and an exclusive writer lock. Existing config/reference files preserved and local pack ignored. Typecheck and 33 service tests pass. Browser check next; three richer legacy adapters, follow-up engine, controlled execution, independent appeal and typed chat remain pending.
 
+
+## Ontology slice C — follow-ups
+Added persisted requests with recipient, accountable owner, due/escalation dates, reminder policy, idempotency keys, verified reply references and proof-linked dependency release. API loads generate persisted due/escalation reminders without external delivery. Review rejects outstanding follow-ups. Typecheck and 34 service tests pass. Browser run found two selector ambiguities and a creator-upload permission gap during initial registration; corrected them and started focused reruns. No full-regression claim yet.
+

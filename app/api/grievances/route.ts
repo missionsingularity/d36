@@ -1,3 +1,4 @@
+import {operateFollowUp,followUpActions,processReminders} from '@/lib/grievances/followups';
 import {caseGraph,scopedCase} from '@/lib/grievances/ontology';
 import {NextRequest,NextResponse} from 'next/server';
 import fs from 'node:fs';
@@ -19,7 +20,7 @@ function error(e:unknown){const status=e instanceof GrievanceError||e instanceof
 function origin(req:NextRequest){const value=req.headers.get('origin');if(value&&new URL(value).host!==req.headers.get('host'))throw new GrievanceError('Cross-origin action denied.',403)}
 function download(value:string|Uint8Array,mime:string,filename:string){return new NextResponse(typeof value==='string'?value:new Uint8Array(value).buffer,{headers:{'Content-Type':mime,'Content-Disposition':`attachment; filename="${filename}"`,'Cache-Control':'no-store'}})}
 export async function GET(req:NextRequest){try{
- transaction(s=>ensureGrievances(s));const actor=grievanceActor(req),s=readStore(),g=s.grievances!,q=req.nextUrl.searchParams,caseId=q.get('id'),kind=q.get('kind');
+ transaction(s=>processReminders(ensureGrievances(s)));const actor=grievanceActor(req),s=readStore(),g=s.grievances!,q=req.nextUrl.searchParams,caseId=q.get('id'),kind=q.get('kind');
  if(caseId){const c=getCase(g,caseId,actor);
   if(kind==='attachment'||kind==='preview'){const a=c.attachments.find(a=>a.id===q.get('attachment'));if(!a||! /^[a-f0-9]{64}$/.test(a.hash))throw new GrievanceError('Evidence not found.',404);const bytes=fs.readFileSync(path.join(dataDir(),'grievance-evidence',a.hash));if(kind==='preview'){const {extractOriginal}=await import('@/lib/extraction');let content='';try{content=await extractOriginal(bytes,a.name.split('.').pop()!.toLowerCase())}catch{content='Text preview unavailable. Download the original for inspection.'}return NextResponse.json({name:a.name,text:content||'No readable text found. Inspect the original.',hash:a.hash},{headers:{'Cache-Control':'no-store'}})}return download(new Uint8Array(bytes),a.mime,a.name.replace(/[^a-zA-Z0-9._-]/g,'_'))}
   if(kind==='links')return NextResponse.json(caseGraph(g,c,actor),{headers:{'Cache-Control':'no-store'}});
@@ -63,7 +64,7 @@ export async function POST(req:NextRequest){try{
    return {ok:true};
   }));
  }
- const result=mutateCase(actor,text(b.id,'Case ID',80),b);return NextResponse.json({...result,case:scopedCase(readStore().grievances!,result.case,actor)});
+ const result=(followUpActions as readonly string[]).includes(b.action)?operateFollowUp(actor,text(b.id,'Case ID',80),b):mutateCase(actor,text(b.id,'Case ID',80),b);return NextResponse.json({...result,case:scopedCase(readStore().grievances!,result.case,actor)});
  }catch(e){return error(e)}}
 
 

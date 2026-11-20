@@ -2,7 +2,7 @@ import type {Role} from '../catalog';
 import type {GrievanceCase,GrievanceRole,Persona} from './types';
 export class GrievanceError extends Error {constructor(message:string,public status=400){super(message)}}
 export const actionRoles:Record<string,GrievanceRole[]>={
- member:['supervisor','admin'],duplicate:['officer','supervisor'],issue:['officer','supervisor'],create:['intake','officer','supervisor','admin'],edit:['intake','officer','supervisor','admin'],register:['intake','officer','supervisor','admin'],
+ 'followup-create':['officer','supervisor'],'followup-reply':['officer','supervisor'],member:['supervisor','admin'],duplicate:['officer','supervisor'],issue:['officer','supervisor'],create:['intake','officer','supervisor','admin'],edit:['intake','officer','supervisor','admin'],register:['intake','officer','supervisor','admin'],
  assign:['supervisor','admin'],transfer:['supervisor','admin'],start:['officer','supervisor'],request:['officer','supervisor'],resume:['officer','supervisor'],
  note:['intake','officer','supervisor','approver','admin'],attachment:['intake','officer','supervisor'],verify:['supervisor','approver'],
  proposal:['officer','supervisor'],submit:['officer','supervisor'],approve:['approver'],return:['approver','supervisor'],close:['supervisor','approver'],
@@ -18,5 +18,5 @@ export function authorize(c:GrievanceCase,p:Persona,action:string){
  if(['Closed','Appeal'].includes(c.status)&&!['reopen','appeal'].includes(action))throw new GrievanceError('Closed cases are read-only. Reopen with a reason first.',409);
  if(p.role==='intake'&&c.createdBy!==p.id)throw new GrievanceError('Intake can change only its own cases.',403);
  if(p.role==='intake'&&action==='edit'&&c.status!=='Draft')throw new GrievanceError('Intake can edit only an unregistered draft.',403);
- if(p.role==='officer'&&!['register','edit'].includes(action)&&c.owner!==p.id)throw new GrievanceError('Only the assigned officer can change this case.',403);
+ if(p.role==='officer'&&!['register','edit'].includes(action)&&c.owner!==p.id&&!(action==='attachment'&&c.createdBy===p.id&&['Draft','Received'].includes(c.status)))throw new GrievanceError('Only the assigned officer can change this case.',403);
 }
