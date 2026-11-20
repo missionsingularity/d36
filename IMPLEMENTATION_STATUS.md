@@ -21,3 +21,6 @@ Read the complete Customize Ontology Demo v2 specification. Priority: real five-
 - Shared Approvals/Workflows/People/Notebooks navigation, scoped source selection, scenario Chat commands and full final regression.
 
 No live government, Foundry, AI provider, signature or email integration is configured. Local demo dispatch never sends externally. Production authentication and infrastructure are out of scope.
+
+## First verified milestone
+Checkpoint 604c5d6 pushed successfully to official main. Corrected export format casing. Flagship service test passed; actual Chromium five-scene journey passed in 15.9s (30.0s total), including source previews, v1/v2, wrong-role denial, local receipt, closure blockers, follow-up, reload and five downloads. Restarted stalled development listener in persistent session 86222; /customize returned HTTP 200 on port 3000. Full v2 scope remains in progress.
