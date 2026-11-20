@@ -24,3 +24,6 @@ No live government, Foundry, AI provider, signature or email integration is conf
 
 ## First verified milestone
 Checkpoint 604c5d6 pushed successfully to official main. Corrected export format casing. Flagship service test passed; actual Chromium five-scene journey passed in 15.9s (30.0s total), including source previews, v1/v2, wrong-role denial, local receipt, closure blockers, follow-up, reload and five downloads. Restarted stalled development listener in persistent session 86222; /customize returned HTTP 200 on port 3000. Full v2 scope remains in progress.
+
+## Template milestone
+Added six-stage autosaved editor at /workflows, 10 published seed templates, independent-role/dependency/source validation, immutable publish, duplicate, and version-pinned real engine runs with actual tasks. Two template service tests pass, including execution of all ten operations and invalid-cycle/source rejection. Existing 47 services plus flagship test pass (48 total). Connector disable and return-correction task controls added. New builder + flagship + ten-export Chromium run is active. Full v2 fixture world, SQLite adapter, advanced connector onboarding and expanded scenario interactions remain pending.
