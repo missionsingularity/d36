@@ -70,3 +70,16 @@ Prior Chromium evidence covers launch, predefined question, Chat/Work ID, cited 
 - [ ] Rich follow-ups, three legacy adapters, outbox/ATR execution gates, independent appeals and typed Chat tools.
 - [ ] Final 28-case acceptance matrix and full regression.
 
+
+## Ontology integration checkpoint (supersedes earlier pending slice list)
+- [x] Scoped typed case links, members, specialist triage and duplicate decisions.
+- [x] Evidence requirements, immutable revisions, conflicts, follow-ups and internal reminders.
+- [x] Three local source adapters, mapping, quarantine, canonical snapshots, reconciliation and retained payloads.
+- [x] Exact proposal review, ATR/reply packets, proof-gated manual handoff and independent source confirmation.
+- [x] Independent appeal, historical source finalization, disposal/closure/reopen, typed persistent Chat tools.
+- [x] Documents full-text search, linked case tasks, project counts, scoped search and notifications.
+- [x] TypeScript and 47 service tests; prior production build.
+- [ ] Clean 42-browser regression and final production build after case-transition fixes.
+- [ ] Appeal determination revision/further-evidence branch and separately versioned communication editor.
+- [ ] Successful approval retry replay (current retry safely conflicts), optional provider adapter, formal accessibility and Office visual audit.
+- [x] Official remote unchanged; normal checkpoint pushes succeeded through 7ee0a73. Old HTTP 403 notes are historical.

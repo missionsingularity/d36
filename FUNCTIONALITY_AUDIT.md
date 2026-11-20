@@ -26,3 +26,6 @@
 ## Current grievance upgrade
 Working: case register, intake, originals, exact-version proposals, internal closure/reopen, role/scope checks, reports and fixed CSV import. New service-tested: typed links, multiple case members, duplicate suggestions/decisions and writer exclusion. Partial: case chat templates and local appeal marker. Missing: separate execution/communication/appeal lifecycle, richer external snapshots/adapters, follow-up/escalation and full typed case agent. GitHub access is restored; official pushes currently succeed.
 
+
+## Current ontology audit — 20 November 2026
+Persistent intake, scoped department/district/case permissions, typed links, teams, immutable originals/revisions, evidence requirements/conflicts, follow-ups/reminders, three local adapters, reconciliation, exact review, proof-gated ATR/manual handoff, independent appeals and closure/reopen are implemented. Typed offline Chat shares Work services; case documents/tasks/search/notifications are connected. Typecheck and 47 service tests pass. Production build passed; browser regression found transition failures under correction. See GRIEVANCE_TEST_REPORT.md for 28-case evidence and partial items. Official GitHub checkpoint pushes work; older HTTP 403 entries are historical. No government/AI integration is connected.

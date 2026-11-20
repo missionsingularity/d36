@@ -30,14 +30,14 @@ Every operation also checks project membership, department, district, sensitivit
 3. Attach a synthetic TXT, CSV, PDF or DOCX original (maximum 5 MB). Download or preview it. A different supervisor/approver verifies it. A requested document must be acknowledged before review.
 4. Officer saves proposal v1 and requests review. Every attachment must be verified. Approver checks the originals and either approves the exact version or returns it with a reason.
 5. Editing a reviewed/approved proposal or changing its evidence invalidates the earlier decision. Stale revisions are rejected with HTTP 409. Self-review and wrong-role actions return 403.
-6. Supervisor/approver closes only an approved current proposal, with an action-taken statement, reason and explicit manual-follow-up confirmation. Case tasks must be complete.
+6. Approval alone cannot close a case. Prepare the current ATR/reply packet, obtain independent packet review, record execution and verified submission proof, then obtain independent source confirmation. Complete tasks, requests and follow-ups and resolve evidence/source conflicts. Record disposal, then authorised internal closure with reasons. Nothing is transmitted by this application.
 7. Closed cases are read-only. Supervisor/admin may reopen with a reason; original closure, decisions, files and events remain available. An internal appeal additionally needs a configured policy and attached internal source. No appeal is filed externally.
 
 Each case event records actor, timestamp, before/after stage, revision and a hash linked to the preceding event. These hashes detect accidental changes; they do not make local disk storage tamper-proof.
 
 ## Work, chat and exports
 
-Case chat supports five explicit local questions using permitted case data. These are deterministic templates, not general AI answers. Generated drafts can be saved as versioned proposals and linked to Work. Original source files are accessed through the scoped grievance endpoint. Work exports include the case reference and evidence hashes. Approval and closure stay in the dossier.
+Case chat processes supported typed queries and stages intake, task, follow-up, draft, assignment and source-link changes for confirmation. These deterministic tools use the same transactional services and permissions as Work. Conversations, tool results and source excerpts persist. General AI and remote provider integration are not configured. Original source files are accessed through the scoped grievance endpoint. Work exports include the case reference and evidence hashes. Approval and closure stay in the dossier. See GRIEVANCE_DEMO.md for the current review script.
 
 Existing guided Work can be explicitly linked without altering its source material or its approval process. The two-way case link is visible only to a persona who can read that case. Original Work approval is separate from case proposal approval. Generic chat excludes case Work; scoped case questions belong in Case chat.
 
@@ -62,4 +62,4 @@ Preview shows column values and row validation/duplicates. Confirm imports the e
 
 ## Storage and security limits
 
-Backward-compatible optional grievance fields live in the existing `.data/state.json`. Originals live in `.data/grievance-evidence`, addressed by validated SHA-256 hashes. Both paths are ignored by Git. Transactions are synchronous read/modify/write plus atomic rename, so writes serialize in one Node process. Multiple writer processes, crash recovery across multiple files, distributed locks, production authentication, encryption at rest, malware scanning and enterprise authorization are outside this local demo. Do not enter confidential documents, real identifiers or personal government data.
+Backward-compatible optional grievance fields live in the existing `.data/state.json`. Originals live in `.data/grievance-evidence`, addressed by validated SHA-256 hashes. Both paths are ignored by Git. Transactions acquire an exclusive local lock before read/modify/write and atomic rename; overlapping writers return a retryable conflict. A pre-ontology state backup is retained locally. Crash recovery across multiple files, automatic stale-lock recovery, distributed coordination, production authentication, encryption at rest and malware scanning remain outside this local demo. Do not enter confidential documents, real identifiers or personal government data. Three richer local source adapters now supplement the older CSV intake path; see LEGACY_IMPORT_GUIDE.md.

@@ -1,3 +1,17 @@
+## Current checkpoint � 20 November 2026
+
+This section supersedes the historical entries below. Latest published implementation: 7ee0a73 on main, following 302f609 and a78ecf0. Official origin remains missionsingularity/d36. Write access is available; normal pushes succeeded without rewriting history. Only the pre-existing/generated tsconfig.json modification is intentionally outside the checkpoints.
+
+The existing Next.js app and ten deterministic workflows are preserved. Added persistent grievance intake, scoped teams and typed links, evidence requirements/revisions/conflicts, proof-linked follow-ups, three CSV/JSON source adapters, canonical snapshots/reconciliation, exact-version review, ATR/reply packets, proof-gated manual handoff, independent appeals, disposal/closure/reopen, persistent typed case tools, and Documents/My Tasks/search/notification connections. Chat and Work call the same governed services. No government system or external AI is connected.
+
+The website responds at http://127.0.0.1:3000. Typecheck and 47 service tests passed. A production build passed; the final build and clean 42-test browser regression are running after transition corrections. The initial full browser run passed 36/41; failures and corrections are documented in GRIEVANCE_TEST_REPORT.md. Do not treat that initial run as all-green.
+
+Remaining scope: appeal determination revision/further-evidence handling and separately versioned communication editing; success-replay idempotency for repeated approval; optional remote AI provider; formal accessibility audit and comprehensive Office visual review. OCR, non-Latin PDF rendering, production identity and live government dispatch are unavailable. JSON retains a local writer lock and backup; it is not a production multi-host store. Latest test results and precise next steps belong in GRIEVANCE_TEST_REPORT.md and COMPLETION_TRACKER.md.
+
+Reviewer guides: docs/GRIEVANCE_DEMO.md, docs/GRIEVANCE_ARCHITECTURE.md, docs/GRIEVANCE_API.md and docs/LEGACY_IMPORT_GUIDE.md.
+
+---
+
 # BrahmaGPT project status
 
 Updated 19 November 2026. Base checkpoint `d098a46` on `main`. The commit containing this report is the subsequent local checkpoint (`git log -1 --oneline`). Official remote is `https://github.com/missionsingularity/d36.git`. Publication remains blocked by the previously confirmed GitHub HTTP 403 for `slevel7`. This verification run made no push attempts.
