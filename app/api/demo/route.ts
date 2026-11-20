@@ -1,4 +1,4 @@
-import {policyRead,governedRunAction} from '@/lib/run-policy';
+import {policyRead,governedRunAction,processRunReminders} from '@/lib/run-policy';
 import {defaultPersona} from '@/lib/grievances/permissions';
 import {caseWorkAllowed} from '@/lib/grievances/access';
 import {sendMessage} from '@/lib/chat';
@@ -11,6 +11,7 @@ import {sources,workflows,type Role} from '@/lib/catalog';
 import {readStore,transaction,dataDir,id,hash,now,StoreBusyError} from '@/lib/store';
 import {act,launch,sourceAllowed,assertRun,DomainError,audit} from '@/lib/engine';
 import {exportRun,seedFiles} from '@/lib/exports';
+import {GrievanceError} from '@/lib/grievances/permissions';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 function role(req:NextRequest):Role {
  const token=req.cookies.get('brahma-session')?.value;
@@ -33,10 +34,10 @@ function setSession(response:NextResponse,token:string){
  response.cookies.set('brahma-session',token,{httpOnly:true,sameSite:'strict',path:'/',maxAge:86400,secure:process.env.NODE_ENV==='production'&&process.env.SECURE_COOKIES==='true'});
  return response;
 }
-function err(e:unknown){return NextResponse.json({error:e instanceof Error?e.message:'Request failed'},{status:e instanceof DomainError||e instanceof StoreBusyError?e.status:400})}
+function err(e:unknown){return NextResponse.json({error:e instanceof Error?e.message:'Request failed'},{status:e instanceof DomainError||e instanceof GrievanceError||e instanceof StoreBusyError?e.status:400})}
 function enabled(){if(process.env.DEMO_MODE==='false')throw new DomainError('Local demo disabled. Production authentication is not configured.',503)}
-export async function GET(req:NextRequest){try{enabled();let bootstrap:string|undefined;let user:Role;try{user=role(req)}catch{if(req.nextUrl.searchParams.get('kind')&&req.nextUrl.searchParams.get('kind')!=='health')throw new DomainError('Session required. Open the workspace first.',401);user='officer';bootstrap=createSession(user)}const s=readStore(),q=req.nextUrl.searchParams;const kind=q.get('kind');if(kind==='health')return NextResponse.json({status:'ok',mode:'local-demo',storage:'local-sqlite-with-writer-guard',database:'ready',ai:'offline',legacy:'sample/not-connected'});
- if(kind==='scan'){if(!sourceAllowed('SCAN',user,s))throw new DomainError('Source unavailable',403);await seedFiles();return new NextResponse(fs.readFileSync(path.join(dataDir(),'sources','SCAN.svg')),{headers:{'Content-Type':'image/svg+xml','Cache-Control':'no-store'}})}
+export async function GET(req:NextRequest){try{enabled();let bootstrap:string|undefined;let user:Role;try{user=role(req)}catch{if(req.nextUrl.searchParams.get('kind')&&req.nextUrl.searchParams.get('kind')!=='health')throw new DomainError('Session required. Open the workspace first.',401);user='officer';bootstrap=createSession(user)}let s=readStore();if(processRunReminders(structuredClone(s))){transaction(current=>processRunReminders(current));s=readStore()}const q=req.nextUrl.searchParams;const kind=q.get('kind');if(kind==='health')return NextResponse.json({status:'ok',mode:'local-demo',storage:'local-sqlite-with-writer-guard',database:'ready',ai:'offline',legacy:'sample/not-connected'});
+ if(kind==='dispatch'){const run=s.runs.find(r=>r.id===q.get('id'));if(!run)throw new DomainError('Work not found',404);checkRun(req,run,user,s);if(!run.localDispatch)throw new DomainError('Local receipt not found',404);return new NextResponse(run.localDispatch.receipt,{headers:{'Content-Type':'text/plain; charset=utf-8','Content-Disposition':'attachment; filename=DEMO-local-receipt.txt','Cache-Control':'no-store'}})} if(kind==='scan'){if(!sourceAllowed('SCAN',user,s))throw new DomainError('Source unavailable',403);await seedFiles();return new NextResponse(fs.readFileSync(path.join(dataDir(),'sources','SCAN.svg')),{headers:{'Content-Type':'image/svg+xml','Cache-Control':'no-store'}})}
  if(kind==='source'){const source=sources.find(x=>x.id===q.get('id'));if(!source||!sourceAllowed(source.id,user,s))throw new DomainError('Source unavailable',403);await seedFiles();const format=q.get('format')==='pdf'?'pdf':'txt';return new NextResponse(fs.readFileSync(path.join(dataDir(),'sources',source.id+'.'+format)),{headers:{'Content-Type':format==='pdf'?'application/pdf':'text/plain; charset=utf-8','Content-Disposition':`${q.get('download')?'attachment':'inline'}; filename="${source.id}.${format}"`,'Cache-Control':'no-store'}})}
  if(kind==='export'){const run=s.runs.find(x=>x.id===q.get('id'));if(!run)throw new DomainError('Work not found',404);checkRun(req,run,user,s);const format=q.get('format')||'pdf';const out=await exportRun(run.grievanceCaseId?{...run,status:s.grievances?.cases.find(c=>c.id===run.grievanceCaseId)?.status||run.status}:run,format);transaction(state=>audit(state,user,'Export generated',`${format} / ${out.key}`,run.id));return new NextResponse(new Uint8Array(out.buffer),{headers:{'Content-Type':out.mime,'Content-Disposition':`attachment; filename="BrahmaGPT-${run.workflowId}-v${run.versions.at(-1)!.number}.${format}"`,'Cache-Control':'no-store'}})}
  if(kind==='upload'){const u=s.uploads.find(x=>x.id===q.get('id')&&(x.owner===user||user==='reviewer'));if(!u)throw new DomainError('File unavailable',403);return new NextResponse(fs.readFileSync(path.join(dataDir(),'uploads',u.hash)),{headers:{'Content-Type':'application/octet-stream','Content-Disposition':`attachment; filename="${u.title.replace(/[^a-zA-Z0-9._-]/g,'_')}"`}})}
