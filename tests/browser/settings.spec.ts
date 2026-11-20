@@ -30,6 +30,8 @@ test('account and preferences save separately across personas and refresh',async
   await expect(page.getByRole('status').filter({hasText:'Changes saved'})).toBeVisible();
   await page.reload();
   await expect(page.getByLabel('Display name')).toHaveValue('Sample Guest');
+  await page.request.post('/api/demo',{data:{type:'role',role:'officer'}});
+  await page.request.post('/api/demo',{data:{type:'settings',language:'English',notifications:true,timeZone:'Asia/Kolkata',dateFormat:'DD MMM YYYY'}});
 });
 
 test('reviewer restrictions and restoration persist and are enforced for guest',async({page})=>{
