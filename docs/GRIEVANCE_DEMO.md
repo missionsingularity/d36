@@ -1,0 +1,16 @@
+# Reviewer demonstration
+
+Run `npm.cmd run dev`; open http://127.0.0.1:3000. Use synthetic information only. The website may already be running. Allow about 15 minutes; complete the longer independent appeal branch separately.
+
+1. Open Grievance. As intake, save a draft with required metadata and a small TXT original. Refresh, inspect its internal ID, then register it once. Download the acknowledgement. No official government registration is claimed.
+2. Switch to supervisor. Assign the lead and add a contributor. Inspect the avatars and relationships. A duplicate member or unrelated department should be refused.
+3. As the assigned officer, start work. Add an evidence requirement and a follow-up with owner, due date and a blocked task. Inspect the original preview and hash. Upload the reply; an independent persona verifies it. Resolve that follow-up using the verified proof. Other tasks remain unchanged.
+4. Open Case chat and type `Who is assigned?` or `Which attachments are missing?`. Read the real case answer. Type a draft/task instruction, review the proposed tool action, and confirm. Refresh and switch between Chat and Work; the saved record is retained.
+5. Save a proposed resolution and request review. As the assigned authority, return it with a reason. The officer revises it; the authority approves the new exact version. Editing evidence or the text invalidates the old approval.
+6. In Decision, prepare ATR/reply packets. Have a separate permitted authority review them. Prepare manual handoff: it must still say PREPARED_NOT_SENT. Upload and independently verify synthetic submission proof, record the manual reference, then independently confirm the source receipt. This is staff-attested demonstration evidence, not real delivery.
+7. Complete required tasks. Inspect the full closure-blocker list before disposal. A premature attempt must fail. Once requirements are satisfied, record disposal and authorised closure with reasons. Reopen with a reason and confirm the prior history remains.
+8. In source imports, preview and confirm all three samples. Reimport a sample to see canonical deduplication. Inspect the historical disposed source and explicitly link pension/eOffice data. Changed or stale snapshots stay visible for reconciliation.
+9. For the appeal branch, admin first supplies an illustrative appeal policy with a basis. The supervisor opens an appeal against a historical decision and assigns the appellate persona. The original decision-maker cannot review it. The appellate reviewer records the decision, verified communication and finalization. Only then can the verified historical source be archived internally.
+10. Open My Tasks and Documents: inspect linked case tasks and search actual extracted text. Try a nonmember persona against a direct case/document URL; it must be denied. Return to an authorised persona. Switch dark/light, navigate and reload; appearance persists.
+
+The automated browser suite performs the complete receipt-to-closure journey and imported-case appeal branch using ordinary controls, with direct HTTP negative checks. See `GRIEVANCE_TEST_REPORT.md` for actual results. Original ten demonstrations remain available in New Chat/Work and retain their evidence and five output formats.
