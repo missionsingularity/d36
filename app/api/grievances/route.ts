@@ -1,3 +1,4 @@
+import {grievanceActor} from '@/lib/grievances/session';
 import {operateFollowUp,followUpActions,processReminders} from '@/lib/grievances/followups';
 import {caseGraph,scopedCase} from '@/lib/grievances/ontology';
 import {NextRequest,NextResponse} from 'next/server';
@@ -9,13 +10,7 @@ import {createCase,ensureGrievances,getCase,mutateCase,register,report,text,date
 import {casePdf,historyText,registerCsv,csv,saveAttachment,previewImport,importCases,reverseImport} from '@/lib/grievances/io';
 import type {Persona} from '@/lib/grievances/types';
 export const runtime='nodejs';export const dynamic='force-dynamic';
-function grievanceActor(req:NextRequest):Persona{
- if(process.env.DEMO_MODE==='false')throw new GrievanceError('Local demo disabled.',503);
- const state=readStore(),session=state.sessions?.[req.cookies.get('brahma-session')?.value||''];
- if(!session||session.expiresAt<Date.now())throw new GrievanceError('Open the workspace to start a local demo session.',401);
- const persona=state.grievances?.personas.find(p=>p.id===(session.grievancePersona||defaultPersona(session.role)));
- if(!persona)throw new GrievanceError('Demo identity unavailable.',401);return persona;
-}
+
 function error(e:unknown){const status=e instanceof GrievanceError||e instanceof StoreBusyError?e.status:400,message=e instanceof Error?e.message:'Request failed';return NextResponse.json({error:message,message,code:status===409?'CONFLICT':status===403?'FORBIDDEN':status===401?'SESSION_REQUIRED':status===404?'NOT_FOUND':'VALIDATION',correlationId:id(),retryable:e instanceof StoreBusyError},{status})}
 function origin(req:NextRequest){const value=req.headers.get('origin');if(value&&new URL(value).host!==req.headers.get('host'))throw new GrievanceError('Cross-origin action denied.',403)}
 function download(value:string|Uint8Array,mime:string,filename:string){return new NextResponse(typeof value==='string'?value:new Uint8Array(value).buffer,{headers:{'Content-Type':mime,'Content-Disposition':`attachment; filename="${filename}"`,'Cache-Control':'no-store'}})}

@@ -2,7 +2,7 @@ import type {Role} from '../catalog';
 import type {GrievanceCase,GrievanceRole,Persona} from './types';
 export class GrievanceError extends Error {constructor(message:string,public status=400){super(message)}}
 export const actionRoles:Record<string,GrievanceRole[]>={
- 'followup-create':['officer','supervisor'],'followup-reply':['officer','supervisor'],member:['supervisor','admin'],duplicate:['officer','supervisor'],issue:['officer','supervisor'],create:['intake','officer','supervisor','admin'],edit:['intake','officer','supervisor','admin'],register:['intake','officer','supervisor','admin'],
+ 'source-reconcile':['supervisor','approver'],'followup-create':['officer','supervisor'],'followup-reply':['officer','supervisor'],member:['supervisor','admin'],duplicate:['officer','supervisor'],issue:['officer','supervisor'],create:['intake','officer','supervisor','admin'],edit:['intake','officer','supervisor','admin'],register:['intake','officer','supervisor','admin'],
  assign:['supervisor','admin'],transfer:['supervisor','admin'],start:['officer','supervisor'],request:['officer','supervisor'],resume:['officer','supervisor'],
  note:['intake','officer','supervisor','approver','admin'],attachment:['intake','officer','supervisor'],verify:['supervisor','approver'],
  proposal:['officer','supervisor'],submit:['officer','supervisor'],approve:['approver'],return:['approver','supervisor'],close:['supervisor','approver'],

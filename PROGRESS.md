@@ -75,3 +75,7 @@ Pack appeared after retry. The pack master hash matches the fully read root prom
 ## Ontology slice C — follow-ups
 Added persisted requests with recipient, accountable owner, due/escalation dates, reminder policy, idempotency keys, verified reply references and proof-linked dependency release. API loads generate persisted due/escalation reminders without external delivery. Review rejects outstanding follow-ups. Typecheck and 34 service tests pass. Browser run found two selector ambiguities and a creator-upload permission gap during initial registration; corrected them and started focused reruns. No full-regression claim yet.
 
+
+## Ontology legacy slice checkpoint
+Added three local CSV/JSON adapters with editable mapping, real sample downloads, row-level quarantine, canonical source IDs, preserved historical receipt/disposal, idempotent import keys, retained stale snapshots, conflicts and independent reconciliation. Source-to-case associations require explicit scoped action. Typecheck and all 36 service tests pass. Browser tests still require stable reruns: one navigation/reload timing assertion corrected; member dialog works in direct Chromium inspection. Do not interpret in-progress test failures as verified module completion.
+

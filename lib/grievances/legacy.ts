@@ -1,0 +1,61 @@
+import {hash,id,now,transaction} from '../store';
+import type {GrievanceCase,GrievanceState,Persona} from './types';
+import {canReadCase,GrievanceError,authorize} from './permissions';
+import {date,ensureGrievances,event,getCase,makeCase,text} from './service';
+import {parseCsv,csv} from './io';
+import {addLink,syncOntology} from './ontology';
+export const adapters=['CPGRAMS sample','Kritagyata sample','eOffice sample'] as const;
+export type Adapter=typeof adapters[number];
+export type SourceSnapshot={id:string;sourceAt:string;ingestedAt:string;hash:string;raw:Record<string,string>;actor:string;status:string};
+export type ExternalRecord={id:string;adapter:Adapter;externalId:string;department:string;district:string;caseId?:string;association:'Unverified'|'Verified'|'Suggested';verifiedBy?:string;latest:string;snapshots:SourceSnapshot[];pending?:string;state:'Imported'|'Conflict'|'Stale'|'Verified';mappingVersion:1};
+export type ImportRow={row:number;state:'New'|'Duplicate'|'Update'|'Stale'|'Conflict'|'Quarantined';reason:string;values:Record<string,string>;recordId?:string;caseId?:string};
+export type LegacyState={records:ExternalRecord[];jobs:{id:string;adapter:Adapter;at:string;actor:string;fileHash:string;rows:ImportRow[];requestKey:string}[]};
+export const columns:Record<Adapter,string[]>={
+ 'CPGRAMS sample':['external_id','received','title','narrative','official_status','source_updated_at','department','district','category','priority'],
+ 'Kritagyata sample':['external_id','stage','source_updated_at','grievance_reference','department','district'],
+ 'eOffice sample':['external_id','stage','dispatch_reference','source_updated_at','grievance_reference','department','district']
+};
+export const ensureLegacy=(g:GrievanceState)=>g.legacy??={records:[],jobs:[]};
+function importer(p:Persona){if(!p.member||!['admin','supervisor'].includes(p.role))throw new GrievanceError('Demo admin or supervisor required for local imports.',403)}
+export function sampleFile(adapter:Adapter){const at='2026-11-20T08:00:00Z',rows:Record<Adapter,string[][]>={
+ 'CPGRAMS sample':[['DEMO-GRV-0142','2026-11-01','Illustrative pension delay','Synthetic complaint; signed annexure missing','Pending',at,'Pension','Demo North','Pension delay','High'],['DEMO-GRV-0219','2026-02-01','Historical sample disposal','Synthetic historical case, preserved source status','Disposed','2026-03-10T08:00:00Z','Pension','Demo North','Other','Low']],
+ 'Kritagyata sample':[['DEMO-PEN-142','Awaiting signed annexure',at,'DEMO-GRV-0142','Pension','Demo North']],
+ 'eOffice sample':[['DEMO-FILE-142','Draft noting','NOT-ISSUED',at,'DEMO-GRV-0142','Pension','Demo North']]
+ };return csv([columns[adapter],...rows[adapter]])}
+function parseInput(adapter:Adapter,input:string,mapping:Record<string,string>={}){
+ if(input.length>100000)throw new GrievanceError('Local imports are limited to 100 KB.');const raw=input.replace(/^\uFEFF/,'').trim();let objects:Record<string,unknown>[];
+ if(raw.startsWith('[')){const value=JSON.parse(raw);if(!Array.isArray(value))throw new GrievanceError('Use a JSON array of source records.');objects=value}
+ else{const rows=parseCsv(raw),header=rows.shift();if(!header)throw new GrievanceError('Choose a CSV or JSON export.');if(new Set(header).size!==header.length)throw new GrievanceError('CSV column names must be unique.');objects=rows.map(row=>Object.fromEntries(header.map((key,index)=>[key,row[index]??''])))}
+ if(!objects.length||objects.length>100)throw new GrievanceError('Use between 1 and 100 rows.');return objects.map(row=>{if(!row||typeof row!=='object'||Array.isArray(row))return {};return Object.fromEntries(columns[adapter].map(key=>[key,String(row[mapping[key]||key]??'')]))});
+}
+function validate(adapter:Adapter,raw:Record<string,string>,p:Persona,g:GrievanceState){
+ const values={...raw};values.external_id=text(values.external_id,'External reference',100);values.department=text(values.department,'Department',100);values.district=text(values.district,'District',100);if(!p.departments.includes(values.department)||!p.districts.includes(values.district))throw new GrievanceError('Row is outside your department or district scope.',403);
+ if(!/^(Pension|Records)$/.test(values.department)||!['Demo North','Demo South'].includes(values.district))throw new GrievanceError('Use an eligible demonstration department and district.');const sourceAt=new Date(values.source_updated_at);if(!Number.isFinite(sourceAt.getTime())||!/^\d{4}-\d{2}-\d{2}T/.test(values.source_updated_at))throw new GrievanceError('Source update must be an ISO timestamp.');values.source_updated_at=sourceAt.toISOString();
+ if(adapter==='CPGRAMS sample'){values.received=date(values.received,'Original received date');if(values.received>now().slice(0,10))throw new GrievanceError('Original receipt cannot be in the future.');values.title=text(values.title,'Subject',160);values.narrative=text(values.narrative,'Description',10000);if(!['Pending','In progress','Disposed','Appealed'].includes(values.official_status))throw new GrievanceError('Unsupported official source status.');if(!g.categories.includes(values.category)||!['Low','Medium','High'].includes(values.priority))throw new GrievanceError('Unknown category or priority.')}
+ else{values.stage=text(values.stage,'Source stage',200);values.grievance_reference=text(values.grievance_reference||'','Related grievance reference',100,false)}return values;
+}
+function preview(g:GrievanceState,p:Persona,adapter:Adapter,input:string,mapping:Record<string,string>={}){importer(p);const legacy=ensureLegacy(g),seen=new Set<string>();return parseInput(adapter,input,mapping).map((raw,index):ImportRow=>{
+ try{const values=validate(adapter,raw,p,g),key=values.external_id.toLowerCase();if(seen.has(key))return {row:index+2,state:'Quarantined',reason:'Duplicate external reference within this file.',values};seen.add(key);const record=legacy.records.find(r=>r.adapter===adapter&&r.externalId.toLowerCase()===key);if(!record)return {row:index+2,state:'New',reason:'New canonical source record.',values};const latest=record.snapshots.find(s=>s.id===record.latest)!;const checksum=hash(JSON.stringify(values));const state=record.snapshots.some(s=>s.hash===checksum)?'Duplicate':values.source_updated_at<latest.sourceAt?'Stale':values.source_updated_at===latest.sourceAt?'Conflict':'Update';return {row:index+2,state,reason:state==='Duplicate'?'Original snapshot already preserved.':state==='Stale'?'Older source snapshot; current record will not be overwritten.':'Changed source values require human reconciliation.',values,recordId:record.id,caseId:record.caseId}}
+ catch(e){return {row:index+2,state:'Quarantined',reason:e instanceof Error?e.message:'Invalid row',values:raw}}
+ })}
+export function previewLegacy(g:GrievanceState,p:Persona,adapter:Adapter,input:string,mapping:Record<string,string>={}){if(!adapters.includes(adapter))throw new GrievanceError('Choose a supported local adapter.');const rows=preview(g,p,adapter,input,mapping);return {adapter,mappingVersion:1,columns:columns[adapter],rows,counts:Object.fromEntries(['New','Duplicate','Update','Stale','Conflict','Quarantined'].map(state=>[state,rows.filter(r=>r.state===state).length]))}}
+export function commitLegacy(p:Persona,adapter:Adapter,input:string,mapping:Record<string,string>,requestKey:string){return transaction(s=>{
+ const g=ensureGrievances(s),legacy=ensureLegacy(g);importer(p);const fileHash=hash(adapter+input+JSON.stringify(mapping)),existing=legacy.jobs.find(j=>j.requestKey===requestKey&&j.actor===p.id);if(existing){if(existing.fileHash!==fileHash)throw new GrievanceError('Request key already used for another file.',409);return {...existing,replayed:true}}
+ const rows=previewLegacy(g,p,adapter,input,mapping).rows;
+ for(const row of rows){if(['Quarantined','Duplicate'].includes(row.state))continue;const values=row.values,ingestedAt=now(),snapshot:SourceSnapshot={id:id(),sourceAt:values.source_updated_at,ingestedAt,hash:hash(JSON.stringify(values)),raw:values,actor:p.id,status:values.official_status||values.stage};let record=legacy.records.find(r=>r.id===row.recordId);
+  if(!record){record={id:id(),adapter,externalId:values.external_id,department:values.department,district:values.district,association:'Unverified',latest:snapshot.id,snapshots:[snapshot],state:'Imported',mappingVersion:1};legacy.records.push(record);
+   if(adapter==='CPGRAMS sample'){
+    const policyId='import-unset';if(!g.policies.some(p=>p.id===policyId))g.policies.push({id:policyId,label:'Imported receipt — deadline not established',days:1,semantics:'calendar',effective:'1900-01-01',reference:'Original local source export',explanation:'No applicable deadline has been established. The original receipt date is preserved.',configuredBy:p.id});
+    const c=makeCase(g,p,{title:values.title,narrative:values.narrative,reference:values.external_id,received:values.received,category:values.category,priority:values.priority,department:values.department,district:values.district,office:'Illustrative source export',source:'Legacy CSV',policyId},true);c.due='';c.dueBasis='Imported original receipt. Applicable deadline not established; select a reviewed policy.';if(['Disposed','Appealed'].includes(values.official_status))c.status='Disposed';record.caseId=c.id;row.caseId=c.id;c.revision++;event(c,p,'Source imported',`${adapter} ${values.external_id}; original received ${values.received}; source status ${snapshot.status}; source updated ${snapshot.sourceAt}. Unverified sample association.`);addLink(c,'IMPORTED_FROM',{type:'Grievance',id:c.id},{type:'ExternalRecord',id:record.id},p,'Exact external identity in approved local sample export','Suggested');syncOntology(c,p)
+   }
+  }else{record.snapshots.push(snapshot);if(row.state==='Stale')record.state='Stale';else{record.pending=snapshot.id;record.state='Conflict'}if(record.caseId){const c=g.cases.find(c=>c.id===record!.caseId)!;c.revision++;event(c,p,'Source snapshot retained',`${row.state}: ${record.externalId}; ${snapshot.sourceAt}. Current canonical snapshot unchanged.`)}}row.recordId=record.id;
+ }
+ const job={id:id(),adapter,at:now(),actor:p.id,fileHash,rows,requestKey};legacy.jobs.push(job);return job;
+})}
+export function sourceVisible(g:GrievanceState,r:ExternalRecord,p:Persona){return p.member&&p.departments.includes(r.department)&&p.districts.includes(r.district)&&(!r.caseId||g.cases.some(c=>c.id===r.caseId&&canReadCase(c,p)))}
+export function linkOrReconcile(p:Persona,b:Record<string,unknown>){return transaction(s=>{
+ const g=ensureGrievances(s),legacy=ensureLegacy(g),record=legacy.records.find(r=>r.id===b.recordId);if(!record||!sourceVisible(g,record,p))throw new GrievanceError('Source unavailable in your scope.',403);const c=getCase(g,text(b.caseId||record.caseId,'Case ID',80),p);authorize(c,p,b.action==='link'?'link':'source-reconcile');if(c.revision!==b.revision)throw new GrievanceError('Case changed. Refresh before reconciling.',409);const reason=text(b.reason,'Verification reason',2000);
+ if(b.action==='link'){if(record.caseId&&record.caseId!==c.id)throw new GrievanceError('Source is already associated with another case.',409);record.caseId=c.id;record.association='Verified';record.verifiedBy=p.id;addLink(c,record.adapter==='Kritagyata sample'?'RELATES_TO':'IMPORTED_FROM',{type:'Grievance',id:c.id},{type:record.adapter==='Kritagyata sample'?'PensionCase':'ExternalRecord',id:record.id},p,reason)}
+ else{const snapshot=record.snapshots.find(x=>x.id===b.snapshotId);if(!snapshot)throw new GrievanceError('Select a retained snapshot.');if(snapshot.sourceAt<record.snapshots.find(x=>x.id===record.latest)!.sourceAt)throw new GrievanceError('An older source snapshot cannot replace a newer one.',409);if(snapshot.actor===p.id)throw new GrievanceError('A different reviewer must verify the imported source.',403);record.latest=snapshot.id;record.pending=undefined;record.state='Verified';record.association='Verified';record.verifiedBy=p.id}
+ c.revision++;event(c,p,b.action==='link'?'Source linked':'Source reconciled',`${record.adapter}: ${record.externalId}. ${reason}. Local and source states remain separate.`);return {case:c,record};
+})}
