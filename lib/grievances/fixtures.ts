@@ -6,6 +6,7 @@ export const demoPeople:Persona[]=[
  {id:'approver',name:'Demo Approver',role:'approver',departments:['Pension','Records'],districts:['Demo North','Demo South'],member:true},
  {id:'admin',name:'Demo Admin',role:'admin',departments:['Pension','Records'],districts:['Demo North','Demo South'],member:true},
  {id:'viewer',name:'Demo Viewer',role:'viewer',departments:['Pension'],districts:['Demo North'],member:true},
+ ...(['custodian','reviewer','authority','appellate','auditor','integration'] as const).map(role=>({id:role,name:'Demo '+role.charAt(0).toUpperCase()+role.slice(1),role,departments:['Pension'],districts:['Demo North','Demo South'],member:true})),
  {id:'outside',name:'Demo Other Department',role:'officer',departments:['Unrelated unit'],districts:['Demo North'],member:false}
 ];
 export function emptyGrievances():GrievanceState{return {cases:[],nextSequence:142,personas:structuredClone(demoPeople),categories:['Pension delay','Missing record','Service correction','Other'],policies:[{id:'demo-default',label:'Demo handling target',days:21,semantics:'calendar',reference:'https://pgportal.gov.in/Home/Faq',explanation:'Configurable demonstration target only. Central CPGRAMS timelines do not automatically apply to Assam cases. Confirm the applicable departmental rule before deployment.',effective:'2026-01-01',configuredBy:'demo-fixture'}],batches:[],settingsHistory:[]}}

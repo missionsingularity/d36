@@ -79,3 +79,7 @@ Added persisted requests with recipient, accountable owner, due/escalation dates
 ## Ontology legacy slice checkpoint
 Added three local CSV/JSON adapters with editable mapping, real sample downloads, row-level quarantine, canonical source IDs, preserved historical receipt/disposal, idempotent import keys, retained stale snapshots, conflicts and independent reconciliation. Source-to-case associations require explicit scoped action. Typecheck and all 36 service tests pass. Browser tests still require stable reruns: one navigation/reload timing assertion corrected; member dialog works in direct Chromium inspection. Do not interpret in-progress test failures as verified module completion.
 
+
+## Ontology slice D — controlled execution and appeals
+Added separate persisted ATR/response packets, independent packet review, manual outbox, execution proof, submission proof, independent acknowledgement, feedback and a separate appeal workflow. Closure now returns explicit blockers and cannot jump from approval to closed. Exact proposal/evidence hashes bind the packet and execution. Added custody/reviewer/authority/appellate/auditor demo identities without production claims. Typecheck and 37 service tests pass. Browser journey updated to include all proof gates; stable focused verification running. Remaining: richer typed case Chat, full evidence checklist/conflict UI, source-state polish, final acceptance report and full regression.
+

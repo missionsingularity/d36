@@ -1,3 +1,4 @@
+import {operateExecution,executionActions,closureBlockers} from '@/lib/grievances/execution';
 import {grievanceActor} from '@/lib/grievances/session';
 import {operateFollowUp,followUpActions,processReminders} from '@/lib/grievances/followups';
 import {caseGraph,scopedCase} from '@/lib/grievances/ontology';
@@ -11,7 +12,7 @@ import {casePdf,historyText,registerCsv,csv,saveAttachment,previewImport,importC
 import type {Persona} from '@/lib/grievances/types';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 
-function error(e:unknown){const status=e instanceof GrievanceError||e instanceof StoreBusyError?e.status:400,message=e instanceof Error?e.message:'Request failed';return NextResponse.json({error:message,message,code:status===409?'CONFLICT':status===403?'FORBIDDEN':status===401?'SESSION_REQUIRED':status===404?'NOT_FOUND':'VALIDATION',correlationId:id(),retryable:e instanceof StoreBusyError},{status})}
+function error(e:unknown){const status=e instanceof GrievanceError||e instanceof StoreBusyError?e.status:400,message=e instanceof Error?e.message:'Request failed';return NextResponse.json({error:message,message,code:status===409?'CONFLICT':status===403?'FORBIDDEN':status===401?'SESSION_REQUIRED':status===404?'NOT_FOUND':'VALIDATION',blockers:e instanceof GrievanceError?e.blockers:undefined,correlationId:id(),retryable:e instanceof StoreBusyError},{status})}
 function origin(req:NextRequest){const value=req.headers.get('origin');if(value&&new URL(value).host!==req.headers.get('host'))throw new GrievanceError('Cross-origin action denied.',403)}
 function download(value:string|Uint8Array,mime:string,filename:string){return new NextResponse(typeof value==='string'?value:new Uint8Array(value).buffer,{headers:{'Content-Type':mime,'Content-Disposition':`attachment; filename="${filename}"`,'Cache-Control':'no-store'}})}
 export async function GET(req:NextRequest){try{
@@ -21,7 +22,7 @@ export async function GET(req:NextRequest){try{
   if(kind==='links')return NextResponse.json(caseGraph(g,c,actor),{headers:{'Cache-Control':'no-store'}});
   if(kind==='pdf'||kind==='ack')return download(await casePdf(c,kind==='ack'),'application/pdf',c.id+(kind==='ack'?'-acknowledgement':'-history')+'.pdf');
   if(kind==='history')return download(historyText(c),'text/plain; charset=utf-8',c.id+'-history.txt');
-  return NextResponse.json({case:scopedCase(g,c,actor),actor,ontology:caseGraph(g,c,actor)},{headers:{'Cache-Control':'no-store'}})
+  return NextResponse.json({case:scopedCase(g,c,actor),actor,ontology:caseGraph(g,c,actor),closureBlockers:closureBlockers(c,g)},{headers:{'Cache-Control':'no-store'}})
  }
  const visible=g.cases.filter(c=>canReadCase(c,actor)),filtered=register(g,actor,q);
  if(kind==='csv')return download(registerCsv(filtered),'text/csv; charset=utf-8','grievance-register.csv');
@@ -59,7 +60,7 @@ export async function POST(req:NextRequest){try{
    return {ok:true};
   }));
  }
- const result=(followUpActions as readonly string[]).includes(b.action)?operateFollowUp(actor,text(b.id,'Case ID',80),b):mutateCase(actor,text(b.id,'Case ID',80),b);return NextResponse.json({...result,case:scopedCase(readStore().grievances!,result.case,actor)});
+ const result=(executionActions as readonly string[]).includes(b.action)?operateExecution(actor,text(b.id,'Case ID',80),b):(followUpActions as readonly string[]).includes(b.action)?operateFollowUp(actor,text(b.id,'Case ID',80),b):mutateCase(actor,text(b.id,'Case ID',80),b);return NextResponse.json({...result,case:scopedCase(readStore().grievances!,result.case,actor)});
  }catch(e){return error(e)}}
 
 
