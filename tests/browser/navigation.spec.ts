@@ -23,7 +23,7 @@ test('New Chat, citation preview, notifications and local sharing stay connected
   const shared = await response;
   expect(shared.ok()).toBeTruthy();
   expect((await shared.json()).url).toBe('/chat/'+record.split('/').pop());
-  await expect(page.getByLabel('Work link')).toHaveValue(/\/chat\//);
+  await expect(page.getByRole('textbox',{name:'Work link',exact:true})).toHaveValue(/\/chat\//);
   await page.getByRole('button', {name:'Close dialog'}).click();
   await page.getByRole('button', {name:'Notifications',exact:true}).click();
   await expect(page.getByRole('heading', {name:'Notifications'})).toBeVisible();

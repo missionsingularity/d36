@@ -40,6 +40,19 @@ export async function GET(req:NextRequest){try{enabled();let bootstrap:string|un
 export async function POST(req:NextRequest){try{enabled();const origin=req.headers.get('origin');if(origin&&(new URL(origin).host!==req.headers.get('host')||!['http:','https:'].includes(new URL(origin).protocol)))throw new DomainError('Cross-origin action denied',403);const switching=req.headers.get('content-type')?.includes('application/json')?await req.clone().json().catch(()=>null):null;if(switching?.type==='role'){if(!['officer','reviewer','guest'].includes(switching.role))throw new DomainError('Unknown demo role');return setSession(NextResponse.json({ok:true}),createSession(switching.role))}const user=role(req);
  if(req.headers.get('content-type')?.includes('multipart/form-data')){if(user==='guest')throw new DomainError('Guest is read-only',403);const form=await req.formData();const file=form.get('file');if(!(file instanceof File)||!file.size||file.size>10*1024*1024)throw new DomainError('Choose a file between 1 byte and 10 MB');const bytes=Buffer.from(await file.arrayBuffer());const ext=file.name.split('.').pop()?.toLowerCase();if(!['txt','csv','pdf','docx'].includes(ext||''))throw new DomainError('Supported originals: TXT, CSV, PDF, DOCX');if(ext==='pdf'&&!bytes.subarray(0,5).equals(Buffer.from('%PDF-')))throw new DomainError('Invalid PDF signature');if(ext==='docx'&&bytes.subarray(0,2).toString()!=='PK')throw new DomainError('Invalid DOCX signature');const checksum=hash(bytes);fs.mkdirSync(path.join(dataDir(),'uploads'),{recursive:true});const filePath=path.join(dataDir(),'uploads',checksum);if(!fs.existsSync(filePath))fs.writeFileSync(filePath,bytes);let extracted='';try{extracted=await extractOriginal(bytes,ext!)}catch{extracted='Extraction unavailable. Original preserved; a reviewed text derivative is required.'}const upload={id:id(),title:file.name.slice(0,160),hash:checksum,size:file.size,mime:file.type,createdAt:now(),owner:user,extraction:extracted.trim()||'No readable text found. Original preserved; OCR or manual transcription is required.'};transaction(s=>{s.uploads.push(upload);audit(s,user,'Original uploaded','Unverified private working material')});return NextResponse.json(upload)}
  const body=await req.json();
+ if(body.type==='conversation-work'){
+  const conversation=readStore().conversations?.find(c=>c.id===body.conversationId&&c.owner===user);
+  if(!conversation)throw new DomainError('Conversation unavailable',403);
+  if(conversation.workId){const run=readStore().runs.find(r=>r.id===conversation.workId);if(!run)throw new DomainError('Work unavailable',404);assertRun(run,user,readStore());return NextResponse.json(run)}
+  const run=launch(6,user);
+  transaction(s=>{
+    const thread=s.conversations!.find(c=>c.id===conversation.id)!;
+    thread.workId=run.id;
+    s.runs.find(r=>r.id===run.id)!.conversationId=thread.id;
+    audit(s,user,'Conversation linked to work','Office-note draft prepared for review',run.id);
+  });
+  return NextResponse.json(run);
+ }
  if(body.type==='message')return NextResponse.json(sendMessage(user,body.text,body.conversationId));
  if(body.type==='launch')return NextResponse.json(launch(Number(body.workflowId),user,body.date));
  if(body.runId)return NextResponse.json(act(body.runId,body,user));

@@ -96,3 +96,16 @@ test('PDF and DOCX uploads extract actual text and retain page markers',async()=
   assert.match(await extractOriginal(word,'docx'),/Synthetic office note\nMissing signed annexure/);
   await assert.rejects(()=>extractOriginal(Buffer.from('Invalid'),'docx'));
 });
+
+test('chat uses persisted tasks and denies cross-persona conversation continuation',async()=>{
+  const {sendMessage}=await import('../lib/chat');
+  const run=launch(5,'officer');
+  const thread=sendMessage('officer','show my overdue tasks');
+  assert.match(thread.messages.at(-1)!.text,/Verify annexure/);
+  assert.ok(thread.messages.at(-1)!.citations.includes('SOP:1'));
+  assert.throws(()=>sendMessage('guest','continue',thread.id));
+  const next=sendMessage('officer','find records about pension',thread.id);
+  assert.equal(next.messages.length,4);
+  assert.ok(next.messages.at(-1)!.citations.length>0);
+  assert.equal(readStore().runs.find(r=>r.id===run.id)?.id,run.id);
+});

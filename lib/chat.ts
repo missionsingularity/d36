@@ -19,9 +19,11 @@ export function sendMessage(role:Role,text:unknown,conversationId?:string) {
       const overdue=/overdue/.test(query);
       const today=now().slice(0,10);
       const matches=tasks.filter(t=>!overdue||(t.due<today&&!['Verified complete','Cancelled'].includes(t.status)));
+      citations=[...new Set(runs.filter(r=>r.tasks.some(task=>matches.includes(task))).flatMap(r=>r.sourceIds.map(source=>source+':1')))];
       answer=matches.length?matches.map(t=>`${t.title} — ${t.status}; owner ${t.owner}; due ${t.due}; proof ${t.proof||'missing'}`).join('\n'):'No matching tasks in the accessible saved records. Create a work plan from Customize to add tasks.';
     } else if(/approval|review request/.test(query)) {
       const matches=runs.filter(r=>r.status==='Review requested');
+      citations=[...new Set(matches.flatMap(r=>r.sourceIds.map(source=>source+':1')))];
       answer=matches.length?matches.map(r=>`${r.title} — version ${r.reviewVersion}; review requested`).join('\n'):'There are no pending review requests in your accessible records.';
     } else {
       const words=query.split(/\W+/).filter(word=>word.length>3&&!['show','find','about','which','please','summarise','documents','records'].includes(word));
