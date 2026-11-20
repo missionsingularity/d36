@@ -26,3 +26,6 @@
 | 10 Outreach | PARTIAL | Preserved existing tenth workflow per specification; no real contact. Reconcile remains a separate Legacy operation |
 
 Next: execute the new template tests and builder browser journey, rerun all ten source/output cases and full regression, then update this report with actual results. Pending specification areas are listed in IMPLEMENTATION_STATUS.md. Baseline results do not imply that all v2 fixtures or every new screen is complete.
+
+## SQLite-backed realistic scenario verification
+Actual command: npx.cmd playwright test tests/browser/scenarios.spec.ts tests/browser/builder.spec.ts tests/browser/flagship.spec.ts. Result: 11 passed, 1.5 minutes. Covers every one of the ten scenarios (flagship plus nine source-driven operations), actual source opening, persisted IDs, five output downloads, PDF parsing and forbidden derived export/mutation. Initial preview failures were outgoing-route interaction races; controls now become inert during navigation and tests await the destination URL. All eleven passed on rerun. Service tests additionally prove changed source versions and check dates change results, while missing verification blocks review. The exact expanded v2 business scripts and complete connector/builder options still require further work, so the prior PARTIAL entries remain appropriately scoped.
