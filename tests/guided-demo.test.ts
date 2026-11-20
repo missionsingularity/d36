@@ -8,6 +8,8 @@ import {guidedAction,guidedSnapshot,launchFlagship,ensureGuided} from '../lib/gu
 import {transaction} from '../lib/store';
 import {exportRun} from '../lib/exports';
 import {PDFDocument} from 'pdf-lib';
+import {agentMessage,confirmAgent} from '../lib/grievances/agent';
+import {mutateCase} from '../lib/grievances/service';
 let dir:string,previous:string|undefined;
 beforeEach(()=>{previous=process.env.BRAHMA_DATA_DIR;dir=fs.mkdtempSync(path.join(os.tmpdir(),'brahma-guided-'));process.env.BRAHMA_DATA_DIR=dir;transaction(s=>ensureGuided(s))});
 afterEach(()=>{if(previous===undefined)delete process.env.BRAHMA_DATA_DIR;else process.env.BRAHMA_DATA_DIR=previous;fs.rmSync(dir,{recursive:true,force:true})});
@@ -20,3 +22,4 @@ test('five-scene pension case executes real governed actions, files and closure'
  const work=readStore().runs.find(r=>r.grievanceCaseId===c.id)!;for(const format of ['PDF','DOCX','XLSX','PPTX','TXT']){const file=await exportRun(work,format.toLowerCase());assert.ok(file.buffer.length>100);if(format==='PDF')assert.ok((await PDFDocument.load(file.buffer)).getPageCount()>0)}
  assert.throws(()=>guidedSnapshot(person('outside'),run.id),/scope/);
 });
+test('typed flagship reference resolves the saved case and cannot bypass separate section review',async()=>{let run=launchFlagship(person('DEMO-U-DA'),'chat-launch');const act=(role:string,action:string)=>{const result=guidedAction(person(role),run.id,{action,revision:run.revision,requestKey:action,reason:'Independent synthetic verification'});run=result.run;return result.case};act('DEMO-U-DA','reconstruct');act('DEMO-U-DA','attach-service');act('DEMO-U-RV','verify');act('DEMO-U-DA','complete-verification');const c=act('DEMO-U-DA','prepare-note');assert.throws(()=>mutateCase(person('DEMO-U-DA'),c.id,{action:'submit',revision:c.revision}),/section review/);let thread=await agentMessage(person('DEMO-U-DA'),'Open demo grievance DEMO-GRV-2026-0042 and show its timeline.');assert.equal(thread.caseId,c.id);thread=await agentMessage(person('DEMO-U-DA'),'Send the current draft for review.',c.id,thread.id);const proposal=thread.messages.at(-1)!.proposal!;assert.equal(proposal.tool,'guided');confirmAgent(person('DEMO-U-DA'),thread.id,proposal.id);assert.equal(readStore().guided!.runs[0].review?.status,'Pending');assert.equal(readStore().grievances!.cases.find(x=>x.id===c.id)!.status,'In progress')});
