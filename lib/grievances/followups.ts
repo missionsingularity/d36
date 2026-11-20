@@ -1,7 +1,7 @@
 import type {Store} from '../types';
 import {hash,id,now,transaction} from '../store';
 import type {GrievanceCase,GrievanceState,Persona} from './types';
-import {authorize,GrievanceError} from './permissions';
+import {currentPersona,authorize,GrievanceError} from './permissions';
 import {date,ensureGrievances,event,getCase,text} from './service';
 import {syncOntology} from './ontology';
 export type FollowUp={id:string;item:string;recipient:string;owner:string;due:string;escalate:string;reminderDays:number;taskId:string;blockingTaskId?:string;createdAt:string;status:'Open'|'Resolved';lastReminder?:string;response?:{attachmentId:string;reference:string;actor:string;at:string}};
@@ -15,7 +15,7 @@ export function processReminders(g:GrievanceState,at=now()){
  return count;
 }
 export function applyFollowUp(s:Store,p:Persona,caseId:string,b:Record<string,unknown>){
- const g=ensureGrievances(s),c=getCase(g,caseId,p),queue=ensureFollowUps(c),action=text(b.action,'Action',50);authorize(c,p,action);
+ const g=ensureGrievances(s);p=currentPersona(g,p);const c=getCase(g,caseId,p),queue=ensureFollowUps(c),action=text(b.action,'Action',50);authorize(c,p,action);
  const key=b.requestKey?text(b.requestKey,'Request key',100):'',fingerprint=hash(JSON.stringify({...b,revision:undefined,requestKey:undefined}));if(key&&queue.keys[key]){if(queue.keys[key]!==fingerprint)throw new GrievanceError('Request key was already used for a different action.',409);return {case:c,replayed:true}}
  if(b.revision!==c.revision)throw new GrievanceError('Case changed. Refresh before saving.',409);let detail='';
  if(action==='followup-create'){
