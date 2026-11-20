@@ -61,3 +61,12 @@ Prior Chromium evidence covers launch, predefined question, Chat/Work ID, cited 
 - [x] A real browser opened every displayed citation and generated and parsed all five draft formats for each of the ten workflows.
 - [x] Fixed stale approvals/handoff indicators, duplicate in-flight launches, and missing scenario rows in XLSX exports.
 - [ ] Finish the remaining scenario-specific actions and presentation coverage listed in [WORKFLOW_TEST_REPORT.md](WORKFLOW_TEST_REPORT.md).
+
+## New grievance ontology scope
+- [x] Preserve original cases, ten workflows and official remote.
+- [x] Typed links, issue records, collaborator roles and duplicate candidate decisions (service-tested).
+- [x] Exclusive local writer guard and pre-upgrade backup.
+- [ ] Verify new ontology/team journeys in Chromium.
+- [ ] Rich follow-ups, three legacy adapters, outbox/ATR execution gates, independent appeals and typed Chat tools.
+- [ ] Final 28-case acceptance matrix and full regression.
+

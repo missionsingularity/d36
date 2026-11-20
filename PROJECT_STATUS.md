@@ -49,3 +49,7 @@ TypeScript passed. Three Chromium regressions passed: persistent record/tab navi
 GitHub write access is now available. A normal fast-forward push to missionsingularity/d36/main succeeded through e94980b. The preceding HTTP 403 statements above describe historical checks.
 
 Remaining master-prompt work includes grievance CRUD and full lifecycle, scoped department/project membership enforcement, separate approver/admin roles, SQLite migration, configurable remote provider, notebook sources and reversible legacy import. The current project-member roles are local labels with role-based mutation checks. They do not yet provide department isolation.
+
+## Ontology upgrade in progress
+The grievance CRUD/lifecycle module is now implemented and passed a 34-test browser baseline plus production build. New typed ontology/team/duplicate features pass typecheck and 33 service tests; browser verification is pending. Official main pushes succeeded through c174cea. Pack references remain local. Full ontology execution/appeal/source-adapter/typed-agent requirements are not yet complete.
+

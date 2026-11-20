@@ -22,3 +22,7 @@
 - Partial: shared project member access labels, with role-based mutation checks but pending department/project-membership isolation. Three demo roles are supported.
 - Pending: SQLite migration, remote provider adapter, five-role approval route, grievance create/edit/inbox/lifecycle, custom task CRUD and multi-assignee model, legacy reversible import, notebooks, full project archive/restore and department isolation.
 - The d36_codex_pack directory was unavailable. The supplied master prompt and two image files plus the earlier Tasks image were read locally. They were not copied into public source.
+
+## Current grievance upgrade
+Working: case register, intake, originals, exact-version proposals, internal closure/reopen, role/scope checks, reports and fixed CSV import. New service-tested: typed links, multiple case members, duplicate suggestions/decisions and writer exclusion. Partial: case chat templates and local appeal marker. Missing: separate execution/communication/appeal lifecycle, richer external snapshots/adapters, follow-up/escalation and full typed case agent. GitHub access is restored; official pushes currently succeed.
+

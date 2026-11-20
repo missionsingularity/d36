@@ -6,7 +6,7 @@ import {NextRequest,NextResponse} from 'next/server';
 import fs from 'node:fs';
 import path from 'node:path';
 import {sources,workflows,type Role} from '@/lib/catalog';
-import {readStore,transaction,dataDir,id,hash,now} from '@/lib/store';
+import {readStore,transaction,dataDir,id,hash,now,StoreBusyError} from '@/lib/store';
 import {act,launch,sourceAllowed,assertRun,DomainError,audit} from '@/lib/engine';
 import {exportRun,seedFiles} from '@/lib/exports';
 export const runtime='nodejs';export const dynamic='force-dynamic';
@@ -31,7 +31,7 @@ function setSession(response:NextResponse,token:string){
  response.cookies.set('brahma-session',token,{httpOnly:true,sameSite:'strict',path:'/',maxAge:86400,secure:process.env.NODE_ENV==='production'&&process.env.SECURE_COOKIES==='true'});
  return response;
 }
-function err(e:unknown){return NextResponse.json({error:e instanceof Error?e.message:'Request failed'},{status:e instanceof DomainError?e.status:400})}
+function err(e:unknown){return NextResponse.json({error:e instanceof Error?e.message:'Request failed'},{status:e instanceof DomainError||e instanceof StoreBusyError?e.status:400})}
 function enabled(){if(process.env.DEMO_MODE==='false')throw new DomainError('Local demo disabled. Production authentication is not configured.',503)}
 export async function GET(req:NextRequest){try{enabled();let bootstrap:string|undefined;let user:Role;try{user=role(req)}catch{if(req.nextUrl.searchParams.get('kind')&&req.nextUrl.searchParams.get('kind')!=='health')throw new DomainError('Session required. Open the workspace first.',401);user='officer';bootstrap=createSession(user)}const s=readStore(),q=req.nextUrl.searchParams;const kind=q.get('kind');if(kind==='health')return NextResponse.json({status:'ok',mode:'local-demo',storage:'atomic-json',ai:'offline'});
  if(kind==='scan'){if(!sourceAllowed('SCAN',user,s))throw new DomainError('Source unavailable',403);await seedFiles();return new NextResponse(fs.readFileSync(path.join(dataDir(),'sources','SCAN.svg')),{headers:{'Content-Type':'image/svg+xml','Cache-Control':'no-store'}})}

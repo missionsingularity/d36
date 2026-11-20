@@ -1,7 +1,8 @@
+import {caseGraph,scopedCase} from '@/lib/grievances/ontology';
 import {NextRequest,NextResponse} from 'next/server';
 import fs from 'node:fs';
 import path from 'node:path';
-import {readStore,transaction,dataDir,now} from '@/lib/store';
+import {readStore,transaction,dataDir,now,id,StoreBusyError} from '@/lib/store';
 import {defaultPersona,canReadCase,GrievanceError} from '@/lib/grievances/permissions';
 import {createCase,ensureGrievances,getCase,mutateCase,register,report,text,date} from '@/lib/grievances/service';
 import {casePdf,historyText,registerCsv,csv,saveAttachment,previewImport,importCases,reverseImport} from '@/lib/grievances/io';
@@ -14,22 +15,23 @@ function grievanceActor(req:NextRequest):Persona{
  const persona=state.grievances?.personas.find(p=>p.id===(session.grievancePersona||defaultPersona(session.role)));
  if(!persona)throw new GrievanceError('Demo identity unavailable.',401);return persona;
 }
-function error(e:unknown){return NextResponse.json({error:e instanceof Error?e.message:'Request failed'},{status:e instanceof GrievanceError?e.status:400})}
+function error(e:unknown){const status=e instanceof GrievanceError||e instanceof StoreBusyError?e.status:400,message=e instanceof Error?e.message:'Request failed';return NextResponse.json({error:message,message,code:status===409?'CONFLICT':status===403?'FORBIDDEN':status===401?'SESSION_REQUIRED':status===404?'NOT_FOUND':'VALIDATION',correlationId:id(),retryable:e instanceof StoreBusyError},{status})}
 function origin(req:NextRequest){const value=req.headers.get('origin');if(value&&new URL(value).host!==req.headers.get('host'))throw new GrievanceError('Cross-origin action denied.',403)}
 function download(value:string|Uint8Array,mime:string,filename:string){return new NextResponse(typeof value==='string'?value:new Uint8Array(value).buffer,{headers:{'Content-Type':mime,'Content-Disposition':`attachment; filename="${filename}"`,'Cache-Control':'no-store'}})}
 export async function GET(req:NextRequest){try{
  transaction(s=>ensureGrievances(s));const actor=grievanceActor(req),s=readStore(),g=s.grievances!,q=req.nextUrl.searchParams,caseId=q.get('id'),kind=q.get('kind');
  if(caseId){const c=getCase(g,caseId,actor);
   if(kind==='attachment'||kind==='preview'){const a=c.attachments.find(a=>a.id===q.get('attachment'));if(!a||! /^[a-f0-9]{64}$/.test(a.hash))throw new GrievanceError('Evidence not found.',404);const bytes=fs.readFileSync(path.join(dataDir(),'grievance-evidence',a.hash));if(kind==='preview'){const {extractOriginal}=await import('@/lib/extraction');let content='';try{content=await extractOriginal(bytes,a.name.split('.').pop()!.toLowerCase())}catch{content='Text preview unavailable. Download the original for inspection.'}return NextResponse.json({name:a.name,text:content||'No readable text found. Inspect the original.',hash:a.hash},{headers:{'Cache-Control':'no-store'}})}return download(new Uint8Array(bytes),a.mime,a.name.replace(/[^a-zA-Z0-9._-]/g,'_'))}
+  if(kind==='links')return NextResponse.json(caseGraph(g,c,actor),{headers:{'Cache-Control':'no-store'}});
   if(kind==='pdf'||kind==='ack')return download(await casePdf(c,kind==='ack'),'application/pdf',c.id+(kind==='ack'?'-acknowledgement':'-history')+'.pdf');
   if(kind==='history')return download(historyText(c),'text/plain; charset=utf-8',c.id+'-history.txt');
-  return NextResponse.json({case:c,actor},{headers:{'Cache-Control':'no-store'}})
+  return NextResponse.json({case:scopedCase(g,c,actor),actor,ontology:caseGraph(g,c,actor)},{headers:{'Cache-Control':'no-store'}})
  }
  const visible=g.cases.filter(c=>canReadCase(c,actor)),filtered=register(g,actor,q);
  if(kind==='csv')return download(registerCsv(filtered),'text/csv; charset=utf-8','grievance-register.csv');
  if(kind==='report'){const counts=report(visible);return download(csv([['Group','Value','Count'],...Object.entries(counts).flatMap(([key,value])=>typeof value==='object'&&value!==null?Object.entries(value).map(([name,count])=>[key,name,count]):[[key,'',value??'Not available']])]),'text/csv; charset=utf-8','grievance-report.csv')}
  const page=Math.max(1,Math.min(10000,Number(q.get('page'))||1)),size=10;
- return NextResponse.json({actor,people:g.personas.filter(p=>actor.role==='admin'||(p.member&&p.departments.some(d=>actor.departments.includes(d)))).map(p=>({...p})),cases:filtered.slice((page-1)*size,page*size),total:filtered.length,page,size,summary:report(visible),myCases:visible.filter(c=>c.owner===actor.id&&!['Closed','Voided'].includes(c.status)),attention:visible.filter(c=>!c.owner&&!['Draft','Closed','Voided'].includes(c.status)),recent:visible.flatMap(c=>c.events.map(e=>({...e,caseId:c.id,title:c.title}))).sort((a,b)=>b.at.localeCompare(a.at)).slice(0,12),policies:g.policies,categories:g.categories,batches:actor.role==='admin'?g.batches:[],settingsHistory:actor.role==='admin'?g.settingsHistory:[]},{headers:{'Cache-Control':'no-store'}})
+ return NextResponse.json({actor,people:g.personas.filter(p=>actor.role==='admin'||(p.member&&p.departments.some(d=>actor.departments.includes(d)))).map(p=>({...p})),cases:filtered.slice((page-1)*size,page*size).map(c=>scopedCase(g,c,actor)),total:filtered.length,page,size,summary:report(visible),myCases:visible.filter(c=>c.owner===actor.id&&!['Closed','Voided'].includes(c.status)).map(c=>scopedCase(g,c,actor)),attention:visible.filter(c=>!c.owner&&!['Draft','Closed','Voided'].includes(c.status)).map(c=>scopedCase(g,c,actor)),recent:visible.flatMap(c=>c.events.map(e=>({...e,caseId:c.id,title:c.title}))).sort((a,b)=>b.at.localeCompare(a.at)).slice(0,12),policies:g.policies,categories:g.categories,batches:actor.role==='admin'?g.batches:[],settingsHistory:actor.role==='admin'?g.settingsHistory:[]},{headers:{'Cache-Control':'no-store'}})
  }catch(e){return error(e)}}
 export async function POST(req:NextRequest){try{
  origin(req);if(Number(req.headers.get('content-length')||0)>6*1024*1024)throw new GrievanceError('Request too large.',413);transaction(s=>ensureGrievances(s));const actor=grievanceActor(req);
@@ -61,7 +63,7 @@ export async function POST(req:NextRequest){try{
    return {ok:true};
   }));
  }
- return NextResponse.json(mutateCase(actor,text(b.id,'Case ID',80),b));
+ const result=mutateCase(actor,text(b.id,'Case ID',80),b);return NextResponse.json({...result,case:scopedCase(readStore().grievances!,result.case,actor)});
  }catch(e){return error(e)}}
 
 

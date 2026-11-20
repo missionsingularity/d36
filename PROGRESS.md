@@ -63,3 +63,11 @@ Projects now opens the persisted grievance dashboard and register. Added intake/
 ## Grievance slice 3 â€” access and browser verification
 All four new Chromium grievance journeys passed in the combined regression: full processing/reopen, HTTP scope and import, asserted light/dark responsive routes and keyboard tabs, and case chat-to-Work with original previews, scoped exports and explicit existing-Work links. Production build passed after removing a non-route helper export rejected by Next.js. Remaining old workflow regressions are still running. Operation guide and verification matrix added. Known demo limits: single-process JSON, no production identity/integrations, Latin-only PDF; Unicode TXT remains available.
 
+
+## Ontology upgrade audit
+Official main/origin preserved. Read the complete available root ontology prompt (sections 0–20); the specifically named pack, accompanying workflow specification and pack screenshot folder are absent from the repository and supplied build-kit directory. Requested their location while continuing safe work from the available prompt. Existing 34-browser regression and final production build passed. Interrupted follow-up: four grievance tests passed; intake validation test failed because its alert selector included Next.js's hidden announcer. Scoped the assertion to the actual form alert. Existing intake/CSV refinements and generated config changes retained. Next: backward-compatible typed ontology, team grants and official-status separation.
+
+
+## Ontology slice A/B checkpoint
+Pack appeared after retry. The pack master hash matches the fully read root prompt; read its supporting workflow specification and prior master and inspected all three screenshots. Added backward-compatible typed case/issues/document-version/task/draft/user relationships, scoped duplicate suggestions with human review, case member roles and lead protection, explicit internal/non-official label, structured error envelopes and an exclusive writer lock. Existing config/reference files preserved and local pack ignored. Typecheck and 33 service tests pass. Browser check next; three richer legacy adapters, follow-up engine, controlled execution, independent appeal and typed chat remain pending.
+

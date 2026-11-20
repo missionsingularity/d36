@@ -13,3 +13,5 @@ MASTER_CODEX_PROMPT.md
 .env.*
 !.env.example
 *.tsbuildinfo
+brahmagpt_grievance_codex_pack/
+BrahmaGPT_D36_Grievance_Ontology_Codex_Prompt.md
