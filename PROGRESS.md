@@ -51,3 +51,7 @@ Shortened navigation, dialog labels, profile and permission explanations, conver
 
 Plain-language verification complete: typecheck and 23 service tests pass. Browser suite: 29 passed, one citation-modal check failed during concurrent live edits; its focused unchanged-code rerun passed, including every citation and all five exports for workflow 4. All 30 checks have successful results across these runs, not a clean single full run. Site returned HTTP 200 on port 3000. Wording checkpoint 7999cc2 successfully pushed to official main.
 
+
+## Grievance slice 1 — domain and API
+Read the full grievance directive. Added backward-compatible grievance state, seeded synthetic cases, scoped demo roles, validated lifecycle, versioned proposals and evidence, audit hash chain, CSV/PDF exports and atomic legacy import/reversal. Seven independent domain tests and typecheck pass. UI integration and HTTP/browser tests are next. Existing tsconfig.json changes preserved. This slice is partial until the interface and journeys are verified.
+
