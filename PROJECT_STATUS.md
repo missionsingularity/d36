@@ -41,3 +41,11 @@ Appearance now lives in the root layout provider. Saved appearance is applied be
 Work records now remember the active tab after navigation and refresh, and the global Work switch returns to the latest permitted record. Route changes close transient menus and clear outdated errors. The overview shows a state-specific next step. Confirmation dialogs provide a saving state, lock their controls until a mutation finishes, and prevent dismissing an in-flight confirmation. A synchronous guard prevents overlapping mutations. Stale refresh responses cannot replace a newer workspace response. Page transitions respect reduced motion.
 
 TypeScript passed. Three Chromium regressions passed: persistent record/tab navigation, single-submit locked confirmation, and unsaved draft preservation after a denied save. The live homepage returned HTTP 200 on port 3000.
+
+## Latest verification and publication
+
+20 November 2026: the complete clean Chromium suite passed 30 tests. TypeScript, 23 service tests and the production build passed. Typed local chat, persisted conversation follow-ups, conversation-to-office-note links, server-issued demo sessions and persisted project members are now implemented and tested. The website is running at http://127.0.0.1:3000.
+
+GitHub write access is now available. A normal fast-forward push to missionsingularity/d36/main succeeded through e94980b. The preceding HTTP 403 statements above describe historical checks.
+
+Remaining master-prompt work includes grievance CRUD and full lifecycle, scoped department/project membership enforcement, separate approver/admin roles, SQLite migration, configurable remote provider, notebook sources and reversible legacy import. The current project-member roles are local labels with role-based mutation checks. They do not yet provide department isolation.

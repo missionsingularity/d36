@@ -36,3 +36,11 @@ Full regression attempt identified test isolation issues: a permission test left
 Regression follow-up: the complete 30-test run reached 28 passes and 2 failures. RTI Work was still loading at the five-second assertion deadline during concurrent compilation. The other failure was the English welcome assertion after the settings test intentionally saved Hindi without restoring it. The settings test now restores its changed preferences; Playwright render expectations allow up to 15 seconds while retaining the overall test deadline. A fresh full rerun is in progress. Final production build passed.
 
 Remote check: fetch confirmed compatible official history at 09680e5. A single dry-run normal push succeeded on 20 November 2026, so publication access is now available. Light/dark Customize captures were visually inspected, including a fix for contrast flashing during theme transitions. Final full-suite result is pending at writing.
+
+## Verified checkpoint, 20 November 2026
+
+Final clean regression: 30 Chromium tests passed in 4.3 minutes. This includes the ten existing workflow launches, every-citation/five-format output checks, typed chat/history, conversation-to-work reuse, forged role-cookie denial, project members, settings, theme persistence, uploads, proof gates and responsive overflow checks. TypeScript passed; 23 service tests passed; production build passed. Light/dark Customize screenshots were captured from the live site and inspected. Port 3000 returned HTTP 200.
+
+GitHub access is restored. The normal fast-forward push to missionsingularity/d36/main succeeded through e94980b, publishing a5d2e4f, d2d7471, 16ecc2c, dbd3328 and e94980b. This report is saved in the subsequent checkpoint.
+
+The full master-prompt scope is still incomplete. Next implementation priority is grievance CRUD/inbox and a guarded lifecycle with distinct Approver identity, followed by scoped project membership authorization and custom task CRUD. SQLite migration, remote provider adapter, notebooks and reversible legacy import remain pending. Existing JSON records and all prior functionality are preserved.
