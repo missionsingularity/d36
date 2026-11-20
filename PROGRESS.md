@@ -12,3 +12,13 @@ Current task: verify extraction via the normal upload and search UI.
 Next immediate task: source-restricted research notebooks and their persisted sources, followed by the attached MVP's source-grounded question flow.
 
 Known limits: scanned PDFs require OCR/manual transcription. General model conversation requires provider configuration. Research notebooks and department selection are incomplete. The earlier ten-workflow catalogue differs from the newer MVP capability list; retain those working workflows while adding the new capability gaps.
+
+## Persistent typed chat milestone
+
+The supplied master prompt (sections 0–16) was read completely. The named d36_codex_pack folder is absent; the supplied D-drive prompt and screenshot files were used, with the earlier Tasks screenshot as the third reference.
+
+Typed New Chat now calls the server and saves independent conversations. Follow-up questions survive refresh and are listed in recent history. Supported deterministic queries search authorised source paragraphs and list actual persisted tasks/overdue work and pending approvals. Citations open exact source excerpts. General model configuration remains unavailable and is stated explicitly. New Chat now sits above Projects; the wide-screen mode switch is centred.
+
+Verified: TypeScript passed and the Chromium typed-query/citation/follow-up/refresh/unsupported-query test passed. Homepage returned HTTP 200 at http://127.0.0.1:3000. No GitHub push attempted because the prior write-access blocker has not changed.
+
+Next slice: durable project membership and conversation-to-work links, then grievance CRUD/lifecycle, server-issued demo sessions, optional provider adapter, legacy import and notebooks. SQLite migration and five-role approval scope remain open; current data is preserved in the existing JSON store.

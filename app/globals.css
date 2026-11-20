@@ -45,3 +45,15 @@ input[type=checkbox]{accent-color:var(--strong)}
 @media (max-width: 760px) {
   .next-step { align-items: flex-start; flex-direction: column; }
 }
+
+@media(min-width:1251px){
+  .topbar { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); }
+  .top-actions { justify-self:end; margin-left:0; min-width:0; }
+  .topbar .view-switch { justify-self:center; }
+  .topbar .breadcrumb { min-width:0; }
+  .view-switch button { min-height:40px; }
+}
+.sidebar > .new-chat { justify-content:flex-start; width:100%; margin-bottom:15px; background:var(--hover); }
+.brand { margin-bottom:24px; }
+.conversation > .findings { margin:22px 0 32px; }
+.conversation .inline-form textarea { flex:1; min-height:72px; border:1px solid var(--border); border-radius:10px; background:var(--bg); padding:14px; resize:vertical; }

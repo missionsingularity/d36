@@ -6,4 +6,5 @@ export type Run={id:string;workflowId:number;title:string;createdAt:string;quest
 export type Audit={id:string;at:string;actor:Role;action:string;runId?:string;detail:string};
 export type Upload={id:string;title:string;hash:string;size:number;mime:string;createdAt:string;owner:Role;extraction:string};
 export type WorkspaceSettings={name:string;language:string;notifications:boolean;email?:string;phone?:string;designation?:string;timeZone?:string;dateFormat?:string};
-export type Store={schema:1;runs:Run[];audit:Audit[];uploads:Upload[];projects:{id:string;name:string;purpose:string}[];settings:WorkspaceSettings;profiles?:Partial<Record<Role,WorkspaceSettings>>;revoked:string[]};
+export type Conversation={id:string;owner:Role;title:string;createdAt:string;messages:{id:string;role:"user"|"assistant";text:string;citations:string[];at:string}[]};
+export type Store={schema:1;conversations?:Conversation[];runs:Run[];audit:Audit[];uploads:Upload[];projects:{id:string;name:string;purpose:string}[];settings:WorkspaceSettings;profiles?:Partial<Record<Role,WorkspaceSettings>>;revoked:string[]};
