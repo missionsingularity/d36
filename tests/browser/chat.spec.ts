@@ -18,3 +18,14 @@ test('typed local chat returns real source excerpts and retains the conversation
   await page.getByRole('button',{name:'Send',exact:true}).click();
   await expect(page.locator('.conversation')).toContainText('A general language model is not configured');
 });
+
+test('forged role cookie does not change server session permissions',async({page})=>{
+  await page.goto('/profile');
+  await page.getByLabel('Demo persona').selectOption('guest');
+  await expect(page.getByLabel('Display name')).toHaveValue('Guest Viewer');
+  await page.context().addCookies([{name:'brahma-role',value:'reviewer',url:'http://127.0.0.1:3100'}]);
+  const state=await (await page.request.get('/api/demo')).json();
+  expect(state.role).toBe('guest');
+  expect((await page.request.get('/api/demo?kind=source&id=RESTRICTED')).status()).toBe(403);
+  expect((await page.request.post('/api/demo',{data:{type:'launch',workflowId:6}})).status()).toBe(403);
+});

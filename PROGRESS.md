@@ -22,3 +22,9 @@ Typed New Chat now calls the server and saves independent conversations. Follow-
 Verified: TypeScript passed and the Chromium typed-query/citation/follow-up/refresh/unsupported-query test passed. Homepage returned HTTP 200 at http://127.0.0.1:3000. No GitHub push attempted because the prior write-access blocker has not changed.
 
 Next slice: durable project membership and conversation-to-work links, then grievance CRUD/lifecycle, server-issued demo sessions, optional provider adapter, legacy import and notebooks. SQLite migration and five-role approval scope remain open; current data is preserved in the existing JSON store.
+
+## Session and project-member slice
+
+Permission resolution now uses a server-issued opaque HttpOnly/SameSite demo session stored on the server. The labelled persona switcher issues a new session. The old role cookie is ignored. Anonymous direct source/export requests require a session. This remains local demonstrator identity, with the existing three personas; five-role approval separation is pending.
+
+Verified Chromium: existing HTTP permissions/upload/export checks, chat persistence, reviewer restriction/restoration, and a forged role-cookie denial all passed. Project member add/remove, avatar stacks, per-member project labels and last-owner protection are implemented, with Chromium verification passed for adding three users, refresh persistence, removal and last-owner denial. The picker received an explicit accessible label after the initial browser attempt exposed the missing label. Project roles currently describe the shared local project membership and do not yet implement full department/membership isolation.
