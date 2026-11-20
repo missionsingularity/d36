@@ -1,26 +1,26 @@
 # Customize v2 implementation status
 
-20 November 2026. Existing repository and main history preserved. Starting HEAD: `26889d5`; origin `https://github.com/missionsingularity/d36.git`.
+Updated 21 November 2026. Official `origin` is `https://github.com/missionsingularity/d36.git`, branch `main`. Latest checkpoint `62cc07d` was pushed successfully. Earlier milestones below are historical.
 
-Read the complete Customize Ontology Demo v2 specification. Priority: real five-scene pension case, then shared infrastructure for the remaining scenarios. The original ten workflows remain available; the tenth is Outreach and will be preserved.
+## Current application
 
-## Current slice
+- Next.js app is running persistently at `http://127.0.0.1:3000`; the homepage and `/api/demo?kind=health` returned HTTP 200.
+- Ten deterministic, offline demonstrations use persistent SQLite records, linked synthetic source PDFs/DOCX, citations, review gates and generated PDF/DOCX/XLSX/PPTX/TXT outputs. The five-scene pension grievance is browser-tested through review, local dispatch receipt, follow-up and closure.
+- The workflow editor, shared Chat/Work navigation, grievance lifecycle, role-scoped case records, legacy sample imports, documents, My Tasks, preferences, theme persistence and secondary workspace pages have browser coverage.
+- Local demo personas and local dispatch are simulations. No government system, external AI, email, signature, or live connector is configured. Scanned-document OCR and multilingual PDF rendering are limited; production authentication and multi-host infrastructure are out of scope.
 
-- Added a persistent guided run linked to the existing grievance, Work, tasks, documents, source records and audit.
-- Customize offers Try pension example and saved-run resume; `/examples/{runId}` shows five scenes and role-specific controls.
-- Added six server-resolved fictional demonstration identities, separate section review and authority approval, source previews, editable note versions, actual exports, local dispatch receipt and proof-gated follow-up/closure.
-- Reused the existing transactional JSON store and case services. Extracted a pure execution action for atomic composition; did not replace working persistence or the backend. SQLite migration and a complete repository adapter remain pending.
-- Preserved the preceding uncommitted appeal evidence/revision implementation and user reference documents. TypeScript passed after connecting the initial scene view. Full service/browser verification is next; no flagship PASS claim yet.
+## Verification on 21 November
 
-## Remaining specification
+- `npm.cmd test`: 60 passed, 0 failed.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run build` with isolated `.next-build-final`: passed.
+- Playwright full run reached all 59 tests; 56 passed. Three test failures were isolated to test assumptions/state carry-over. The corrected settings and three workspace journeys passed together; the dispatch journey passed separately; grievance selection, legacy import and guest permission corrections also passed focused reruns. This is verified coverage of every test, but not one aggregate 59/59 run.
+- The ten output workflows each passed result, citation preview and five-format download checks. Nine additional scenario variants plus the flagship passed source-opening, persistence and five-format browser checks.
+- The Playwright wrapper can remain alive after printing the final test results; its idle teardown was interrupted after capturing the results. Node 22 reports its built-in SQLite experimental warning. No page exception was reported in the passed journeys.
 
-- Validate/fix the five-scene journey and negative paths, then add presenter walkthrough and actual test results.
-- Persistent six-stage workflow builder, publish/version/clone, configurable connector registration/disable and safe per-run restart.
-- Coherent 12-pension/8-movement seed world and actual PDF/DOCX source fixtures; current flagship has real section-addressed TXT originals.
-- Extend the other nine realistic scenarios using existing ten-workflow engine; existing functional export tests are baseline evidence, not v2 acceptance.
-- Shared Approvals/Workflows/People/Notebooks navigation, scoped source selection, scenario Chat commands and full final regression.
+## Remaining limits
 
-No live government, Foundry, AI provider, signature or email integration is configured. Local demo dispatch never sends externally. Production authentication and infrastructure are out of scope.
+The application demonstrates source-backed local actions and human approval gates; it does not send or write back to real government systems. Connector registration is local configuration only, scanned originals need manual verification, and accessibility has interaction/layout coverage but no formal audit. See `docs/DEMO_TEST_RESULTS.md` for detailed outcomes.
 
 ## First verified milestone
 Checkpoint 604c5d6 pushed successfully to official main. Corrected export format casing. Flagship service test passed; actual Chromium five-scene journey passed in 15.9s (30.0s total), including source previews, v1/v2, wrong-role denial, local receipt, closure blockers, follow-up, reload and five downloads. Restarted stalled development listener in persistent session 86222; /customize returned HTTP 200 on port 3000. Full v2 scope remains in progress.

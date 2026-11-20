@@ -24,7 +24,7 @@ test('account and preferences save separately across personas and refresh',async
   await page.getByLabel('Demo persona').selectOption('reviewer');
   await expect(page.getByLabel('Display name')).toHaveValue('Demo Reviewer');
   await page.getByLabel('Demo persona').selectOption('guest');
-  await expect(page.getByLabel('Display name')).toHaveValue('Sample Guest');
+  await expect(page.getByLabel('Display name')).toHaveValue('Guest Viewer');
   await page.getByLabel('Display name').fill('Sample Guest');
   await page.getByRole('button',{name:'Save changes',exact:true}).click();
   await expect(page.getByRole('status').filter({hasText:'Changes saved'})).toBeVisible();

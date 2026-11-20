@@ -1,7 +1,6 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Locator} from '@playwright/test';
 
 test('approved work records a follow-up and a role-separated local dispatch receipt',async({page})=>{
- test.setTimeout(360000);
  await page.goto('/customize');
  await page.getByRole('button',{name:'Examples',exact:true}).click();
  const created=page.waitForResponse(r=>r.url().endsWith('/api/scenarios')&&r.request().method()==='POST');
@@ -11,16 +10,13 @@ test('approved work records a follow-up and a role-separated local dispatch rece
  await page.goto('/projects/grievance/cases/'+ref.caseId+'/evidence');
  const choose=async(id:string)=>{await page.getByLabel('Grievance demo persona').selectOption(id);await expect(page.getByLabel('Grievance demo persona')).toHaveValue(id)};
  await choose('DEMO-U-RV');
+ const verifyIfNeeded=async(source:Locator)=>{await expect(source).toBeVisible();if(await source.getByRole('button',{name:'Verify',exact:true}).count()){await source.getByRole('button',{name:'Verify',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Save',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0)}else await expect(source).toContainText('Verified by')};
  const source=page.locator('.gr-evidence').filter({has:page.getByRole('link',{name:'DEMO-CIR-003.pdf',exact:true})});
- await source.getByRole('button',{name:'Verify',exact:true}).click();
- await page.getByRole('dialog').getByRole('button',{name:'Save',exact:true}).click();
- await expect(page.getByRole('dialog')).toHaveCount(0);
+ await verifyIfNeeded(source);
  for(const sourceRef of run.evidenceReferences.slice(1)){
   await page.goto('/projects/grievance/cases/'+sourceRef.caseId+'/evidence');
   const linked=page.locator('.gr-evidence').filter({has:page.getByRole('link',{name:sourceRef.sourceId+'.pdf',exact:true})});
-  await linked.getByRole('button',{name:'Verify',exact:true}).click();
-  await page.getByRole('dialog').getByRole('button',{name:'Save',exact:true}).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await verifyIfNeeded(linked);
  }
  await page.goto('/work/'+run.id);
  await page.getByRole('button',{name:'Decisions',exact:true}).click();

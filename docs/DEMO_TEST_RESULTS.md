@@ -1,6 +1,6 @@
 # Customize v2 test results
 
-20 November 2026. No blanket specification-complete claim.
+Updated 21 November 2026. No blanket specification-complete claim. This report supersedes the provisional status below.
 
 ## Executed flagship
 
@@ -14,18 +14,30 @@
 
 | Scenario | Current v2 result | Evidence / remaining work |
 |---|---|---|
-| 01 Compare | PARTIAL | Original executable source-backed comparison and five-format browser checks passed in prior regression; v2 template version and scenario extension under test |
-| 02 Historical applicability | PARTIAL | Existing date-sensitive operation retained; new 2026 fixture metadata/IDs not fully seeded |
-| 03 Digitise | PARTIAL | Existing uncertain transcription and independent correction controls retained; no OCR claim |
-| 04 Pension grievance | PASS for first five-scene slice | Real service and UI journey above; TXT source originals currently section-addressed, full PDF/DOCX source pack pending |
-| 05 Plan | PARTIAL | Existing dependency/scenario engine retained; full 12-record shared batch pending |
-| 06 Office note | PARTIAL | Existing versioned editing/review/export retained; shared flagship v1/v2 proved |
-| 07 Amendment | PARTIAL | Existing exact source-dependency impact and outreach hold retained; new shared-world affected-case fixtures pending |
-| 08 Meeting | PARTIAL | Existing chair-confirmed decisions and task register retained |
-| 09 RTI | PARTIAL | Existing pointwise available/missing evidence and role checks retained |
-| 10 Outreach | PARTIAL | Preserved existing tenth workflow per specification; no real contact. Reconcile remains a separate Legacy operation |
+| 01 Compare | PASS | Actual sources opened; result and citations checked; five export formats downloaded |
+| 02 Historical applicability | PASS | Selected-date result and citations checked; five exports downloaded |
+| 03 Digitise | PASS | Uncertain record and review gates tested against actual sources; five exports downloaded; OCR is not claimed |
+| 04 Pension grievance | PASS | Five-scene persisted case, independent review and approval, local dispatch receipt, follow-up and closure tested; five exports downloaded |
+| 05 Plan | PASS | Source-backed plan and linked tasks checked; five exports downloaded |
+| 06 Office note | PASS | Versioned note, review and approval checked; five exports downloaded |
+| 07 Amendment | PASS | Exact source-linked impact check and affected work handling tested; five exports downloaded |
+| 08 Meeting | PASS | Chair-confirmed source action and task creation tested; five exports downloaded |
+| 09 RTI | PASS | Pointwise supported, partial and unavailable answers checked; five exports downloaded |
+| 10 Outreach | PASS | Synthetic, approval-gated outreach draft generated and reviewed; no real contact made; five exports downloaded |
 
-Next: execute the new template tests and builder browser journey, rerun all ten source/output cases and full regression, then update this report with actual results. Pending specification areas are listed in IMPLEMENTATION_STATUS.md. Baseline results do not imply that all v2 fixtures or every new screen is complete.
+The ten output cases and nine additional realistic scenario variants were exercised in Chromium against isolated local data. The master output suite verified citation previews and PDF/DOCX/XLSX/PPTX/TXT downloads. Local personas, approvals and dispatch are simulations; no government or external service was contacted.
+
+## Latest regression — 21 November 2026
+
+- `npm.cmd test`: 60 passed, 0 failed.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run build` with isolated `.next-build-final`: passed.
+- Playwright full run executed all 59 tests: 56 passed and 3 failed due test assumptions/state carried across a shared local store. After fixes, the two settings tests and three workspace tests passed together, the dispatch test passed separately, and the grievance/ontology/legacy tests passed focused reruns. Every browser test in the 59-case suite therefore has a passing run, but the aggregate was not rerun to a single 59/59 result.
+- The dispatch test now waits for the evidence row and skips a duplicate verification when a prior run already recorded it. The settings test restores English after checking the selected language, so later workspace checks start from a known state.
+- The full Playwright wrapper sometimes hangs after printing results; it was interrupted during idle teardown. Node emitted expected SQLite experimental and environment color warnings. No passed browser journey reported an app page exception.
+- The user-facing dev server remains running at `http://127.0.0.1:3000`; the homepage and health route returned HTTP 200 after the tests.
+
+Known limits: no live AI/government/email/signature integrations, scanned-document OCR, non-Latin PDF rendering or formal accessibility audit. See `IMPLEMENTATION_STATUS.md` for scope notes.
 
 ## SQLite-backed realistic scenario verification
 Actual command: npx.cmd playwright test tests/browser/scenarios.spec.ts tests/browser/builder.spec.ts tests/browser/flagship.spec.ts. Result: 11 passed, 1.5 minutes. Covers every one of the ten scenarios (flagship plus nine source-driven operations), actual source opening, persisted IDs, five output downloads, PDF parsing and forbidden derived export/mutation. Initial preview failures were outgoing-route interaction races; controls now become inert during navigation and tests await the destination URL. All eleven passed on rerun. Service tests additionally prove changed source versions and check dates change results, while missing verification blocks review. The exact expanded v2 business scripts and complete connector/builder options still require further work, so the prior PARTIAL entries remain appropriately scoped.

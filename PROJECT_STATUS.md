@@ -1,16 +1,14 @@
-## Current checkpoint � 20 November 2026
+﻿## Current checkpoint — 21 November 2026
 
-This section supersedes the historical entries below. Latest published implementation: 7ee0a73 on main, following 302f609 and a78ecf0. Official origin remains missionsingularity/d36. Write access is available; normal pushes succeeded without rewriting history. Only the pre-existing/generated tsconfig.json modification is intentionally outside the checkpoints.
+This section supersedes the historical entries below. Official remote is `https://github.com/missionsingularity/d36.git`, branch `main`. Published checkpoint `62cc07d` pushed successfully without rewriting history. The final test fixes and status updates are being saved as a follow-up checkpoint.
 
-The existing Next.js app and ten deterministic workflows are preserved. Added persistent grievance intake, scoped teams and typed links, evidence requirements/revisions/conflicts, proof-linked follow-ups, three CSV/JSON source adapters, canonical snapshots/reconciliation, exact-version review, ATR/reply packets, proof-gated manual handoff, independent appeals, disposal/closure/reopen, persistent typed case tools, and Documents/My Tasks/search/notification connections. Chat and Work call the same governed services. No government system or external AI is connected.
+The existing Next.js app, persistent SQLite store and ten deterministic workflows are preserved. The five-scene pension case, grievance lifecycle, local synthetic imports, role-scoped records, evidence, approvals, appeals, tasks, Chat/Work, documents and exports are connected. All ten workflows have browser-tested results and five-format downloads. The application uses synthetic data; local personas, approvals and dispatch are demonstrations and no government system or external AI is connected.
 
-The website responds at http://127.0.0.1:3000. Typecheck and 47 service tests passed. A production build passed; the final build and clean 42-test browser regression are running after transition corrections. The initial full browser run passed 36/41; failures and corrections are documented in GRIEVANCE_TEST_REPORT.md. Do not treat that initial run as all-green.
+The website is running at `http://127.0.0.1:3000`; homepage and health checks return HTTP 200. On 21 November, `npm test` passed 60/60, TypeScript typecheck passed and the production build passed. The 59-case Playwright run had 56 passes and three test failures caused by shared-state/assertion issues; all affected tests passed in focused reruns. This gives individual passing evidence for all 59 cases but not one aggregate 59/59 run. Details are in `docs/DEMO_TEST_RESULTS.md`.
 
-Remaining scope: appeal determination revision/further-evidence handling and separately versioned communication editing; success-replay idempotency for repeated approval; optional remote AI provider; formal accessibility audit and comprehensive Office visual review. OCR, non-Latin PDF rendering, production identity and live government dispatch are unavailable. JSON retains a local writer lock and backup; it is not a production multi-host store. Latest test results and precise next steps belong in GRIEVANCE_TEST_REPORT.md and COMPLETION_TRACKER.md.
+Remaining limits: no live AI, government, email or signature integration; no scanned-document OCR or multilingual PDF rendering; no formal accessibility audit. The dev server is a local single-process demo, not production infrastructure.
 
-Reviewer guides: docs/GRIEVANCE_DEMO.md, docs/GRIEVANCE_ARCHITECTURE.md, docs/GRIEVANCE_API.md and docs/LEGACY_IMPORT_GUIDE.md.
-
----
+Reviewer guides: `docs/GRIEVANCE_DEMO.md`, `docs/GRIEVANCE_ARCHITECTURE.md`, `docs/GRIEVANCE_API.md`, `docs/LEGACY_IMPORT_GUIDE.md` and `docs/DEMO_WALKTHROUGH.md`.---
 
 # BrahmaGPT project status
 
