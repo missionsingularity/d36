@@ -27,6 +27,6 @@ test('New Chat, citation preview, notifications and local sharing stay connected
   await page.getByRole('button', {name:'Close dialog'}).click();
   await page.getByRole('button', {name:'Notifications',exact:true}).click();
   await expect(page.getByRole('heading', {name:'Notifications'})).toBeVisible();
-  await page.locator('.notification').first().click();
+  await page.locator('.notification[data-work-id="'+record.split('/').pop()+'"]').first().click();
   await expect(page).toHaveURL(record);
 });

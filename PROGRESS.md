@@ -97,3 +97,5 @@ Connected case documents and full-text excerpts to Documents, case tasks to My T
 
 
 Final QA: production build passed. Full 41-browser run found a Chat-to-Work/tab navigation race; case tabs now use persistent routes and retain the current dossier during same-case transitions. Added architecture, API, import and reviewer guides. Full rerun pending. A restricted service-test invocation failed in Node userInfo with ENOMEM before tests; rerunning outside that restricted process environment.
+
+QA fixes: case route transitions no longer remount the dossier for each tab, preventing lost follow-up forms. Notifications now expose stable record associations for precise navigation testing; legacy acceptance permits already-imported canonical samples from the appeal branch. Added real UI evidence checklist/revision/full-text/task-editor regression. 47 service tests passed after rerun. Latest build passed before these small UI fixes; final build and browser rerun remain required.
