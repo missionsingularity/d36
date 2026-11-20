@@ -57,3 +57,35 @@ input[type=checkbox]{accent-color:var(--strong)}
 .brand { margin-bottom:24px; }
 .conversation > .findings { margin:22px 0 32px; }
 .conversation .inline-form textarea { flex:1; min-height:72px; border:1px solid var(--border); border-radius:10px; background:var(--bg); padding:14px; resize:vertical; }
+
+/* Restrained surfaces and compact tool discovery from the current design brief. */
+:root {
+  --bg: #fcfcfa;
+  --panel: #f4f5f1;
+  --hover: #e9ede7;
+  --text: #202622;
+  --muted: #626c65;
+  --border: #dde2db;
+  --strong: #214535;
+}
+[data-theme=dark] {
+  --bg: #161b19;
+  --panel: #1c2320;
+  --hover: #29332d;
+  --text: #eef2ed;
+  --muted: #acb8af;
+  --border: #354239;
+  --strong: #dce9df;
+  --inverse: #18271e;
+}
+.workflow-grid { gap: 12px; }
+.workflow-card { padding: 20px; }
+.workflow-card h2 { margin-top: 12px; font-size: 17px; }
+.workflow-card p { min-height: 0; margin-bottom: 14px; }
+.primary-nav button { min-height: 40px; padding-top: 8px; padding-bottom: 8px; }
+@media(min-width:1400px){
+  .workflow-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+}
+
+/* Theme changes apply foreground and background together to preserve contrast. */
+button, a.button { transition: box-shadow 180ms, transform 180ms; }

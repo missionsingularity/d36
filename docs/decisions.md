@@ -5,3 +5,7 @@ The latest user instruction overrides the build kit's infrastructure requirement
 The GitHub repository was empty at inspection. Existing history has not been rewritten. Confidential references are read from their original local paths and are never copied into this repository. Only synthetic fixtures and the explicitly supplied public product logo are included.
 
 Primary navigation follows the written brief: Projects, Customize, Documents. Grievance and Outreach remain contextual experiences. Every external interaction is simulated or manual and never represents actual dispatch.
+
+## Current design brief
+
+The latest supplied master prompt requests warm near-white light surfaces, graphite dark surfaces and restrained evergreen action emphasis. The supplied lotus is retained. New Chat is placed above Projects. Wide desktop tool discovery uses a compact three-column grid and the Chat/Work switch is centred with a three-column top bar. Theme foreground/background changes apply together to avoid contrast loss during colour interpolation. Light and dark Customize screenshots were captured from the live app and inspected.
