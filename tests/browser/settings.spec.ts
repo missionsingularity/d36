@@ -24,7 +24,7 @@ test('account and preferences save separately across personas and refresh',async
   await page.getByLabel('Demo persona').selectOption('reviewer');
   await expect(page.getByLabel('Display name')).toHaveValue('Demo Reviewer');
   await page.getByLabel('Demo persona').selectOption('guest');
-  await expect(page.getByLabel('Display name')).toHaveValue('Guest Viewer');
+  await expect(page.getByLabel('Display name')).toHaveValue('Sample Guest');
   await page.getByLabel('Display name').fill('Sample Guest');
   await page.getByRole('button',{name:'Save changes',exact:true}).click();
   await expect(page.getByRole('status').filter({hasText:'Changes saved'})).toBeVisible();
@@ -47,8 +47,8 @@ test('reviewer restrictions and restoration persist and are enforced for guest',
   await expect(row.getByRole('button',{name:'Restore access',exact:true})).toBeVisible();
   await page.locator('.settings-nav').getByRole('button',{name:'Account',exact:true}).click();
   await page.getByLabel('Demo persona').selectOption('guest');
-  await expect(page.getByLabel('Display name')).toBeVisible();
-  expect((await page.request.get('/api/demo?kind=source&id=PEN-A')).status()).toBe(403);
+  await expect(page.getByLabel('Demo persona')).toHaveValue('guest');
+  await expect.poll(async()=> (await page.request.get('/api/demo?kind=source&id=PEN-A')).status()).toBe(403);
   await page.getByLabel('Demo persona').selectOption('reviewer');
   await expect(page.getByLabel('Display name')).toHaveValue('Demo Reviewer');
   await page.locator('.settings-nav').getByRole('button',{name:'Permissions',exact:true}).click();

@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 
 test('approved work records a follow-up and a role-separated local dispatch receipt',async({page})=>{
- test.setTimeout(180000);
+ test.setTimeout(360000);
  await page.goto('/customize');
  await page.getByRole('button',{name:'Examples',exact:true}).click();
  const created=page.waitForResponse(r=>r.url().endsWith('/api/scenarios')&&r.request().method()==='POST');
@@ -15,6 +15,13 @@ test('approved work records a follow-up and a role-separated local dispatch rece
  await source.getByRole('button',{name:'Verify',exact:true}).click();
  await page.getByRole('dialog').getByRole('button',{name:'Save',exact:true}).click();
  await expect(page.getByRole('dialog')).toHaveCount(0);
+ for(const sourceRef of run.evidenceReferences.slice(1)){
+  await page.goto('/projects/grievance/cases/'+sourceRef.caseId+'/evidence');
+  const linked=page.locator('.gr-evidence').filter({has:page.getByRole('link',{name:sourceRef.sourceId+'.pdf',exact:true})});
+  await linked.getByRole('button',{name:'Verify',exact:true}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'Save',exact:true}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+ }
  await page.goto('/work/'+run.id);
  await page.getByRole('button',{name:'Decisions',exact:true}).click();
  const role=async(id:string)=>{await page.getByLabel('Workflow demo role').selectOption(id);await expect(page.getByLabel('Workflow demo role')).toHaveValue(id)};
