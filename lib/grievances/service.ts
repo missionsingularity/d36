@@ -30,7 +30,7 @@ export function ensureGrievances(s:Store):GrievanceState{
 }
 export function getCase(g:GrievanceState,caseId:string,p:Persona){const c=g.cases.find(x=>x.id===caseId);if(!c)throw new GrievanceError('Case not found.',404);if(!canReadCase(c,p))throw new GrievanceError('Case unavailable in your project or department scope.',403);return c}
 export function createCase(p:Persona,data:CaseInput,register=false){return transaction(s=>{const g=ensureGrievances(s);p=currentPersona(g,p);if(!actionRoles.create.includes(p.role)||!p.member)throw new GrievanceError('Your role cannot create cases.',403);return makeCase(g,p,data,register)})}
-export function evidenceHash(c:GrievanceCase){return hash(JSON.stringify({originals:c.attachments.map(a=>[a.id,a.hash,a.verifiedBy||'']),requirements:c.evidenceState||null,issues:c.ontology?.issues.map(i=>({id:i.id,classification:i.classification,reviewedBy:i.reviewedBy,reason:i.reason})),routing:c.ontology?.routing||null}))}
+export function evidenceHash(c:GrievanceCase){return hash(JSON.stringify({originals:c.attachments.filter(a=>a.kind!=='Local receipt').map(a=>[a.id,a.hash,a.verifiedBy||'']),requirements:c.evidenceState||null,issues:c.ontology?.issues.map(i=>({id:i.id,classification:i.classification,reviewedBy:i.reviewedBy,reason:i.reason})),routing:c.ontology?.routing||null}))}
 export function applyCaseAction(s:Store,p:Persona,caseId:string,body:Record<string,unknown>){
  const g=ensureGrievances(s);p=currentPersona(g,p);const c=getCase(g,caseId,p),action=text(body.action,'Action',40);authorize(c,p,action);
  if(body.revision!==c.revision)throw new GrievanceError('This case changed. Refresh before saving.',409);
