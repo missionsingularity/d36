@@ -11,7 +11,7 @@ export function sendMessage(role:Role,text:unknown,conversationId?:string) {
     if(conversationId&&(!thread||thread.owner!==role))throw new DomainError('Conversation unavailable',403);
     if(!thread){thread={id:id(),owner:role,title:question.slice(0,70),createdAt:now(),messages:[]};state.conversations.unshift(thread)}
     const query=question.toLowerCase();
-    const runs=state.runs.filter(r=>!r.grievanceCaseId&&!r.evidenceReferences?.length&&r.sourceIds.every(source=>sourceAllowed(source,role,state)));
+    const runs=state.runs.filter(r=>!r.grievanceCaseId&&!r.policy&&!r.evidenceReferences?.length&&r.sourceIds.every(source=>sourceAllowed(source,role,state)));
     let answer='';
     let citations:string[]=[];
     if(/task|overdue/.test(query)) {

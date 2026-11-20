@@ -12,7 +12,7 @@ export const actionRoles:Record<string,GrievanceRole[]>={
 };
 export function defaultPersona(role:Role){return role==='reviewer'?'approver':role==='guest'?'viewer':'officer'}
 export function currentPersona(g:GrievanceState,p:Persona){const actor=g.personas.find(actor=>actor.id===p.id);if(!actor)throw new GrievanceError('Demo identity is no longer available.',403);return actor}
-export function canReadCase(c:GrievanceCase,p:Persona){return (!['custodian','reviewer','authority','appellate','auditor','integration'].includes(p.role)||c.team.includes(p.id)||c.createdBy===p.id)&&p.member&&p.departments.includes(c.department)&&p.districts.includes(c.district)&&(c.sensitivity!=='Restricted'||['supervisor','approver'].includes(p.role)||c.owner===p.id||c.createdBy===p.id||c.team.includes(p.id))&&(p.role!=='viewer'||c.team.includes(p.id))}
+export function canReadCase(c:GrievanceCase,p:Persona){return (!['custodian','reviewer','authority','appellate','auditor','integration','dispatch'].includes(p.role)||c.team.includes(p.id)||c.createdBy===p.id)&&p.member&&p.departments.includes(c.department)&&p.districts.includes(c.district)&&(c.sensitivity!=='Restricted'||['supervisor','approver'].includes(p.role)||c.owner===p.id||c.createdBy===p.id||c.team.includes(p.id))&&(p.role!=='viewer'||c.team.includes(p.id))}
 export function authorize(c:GrievanceCase,p:Persona,action:string){
  if(!canReadCase(c,p))throw new GrievanceError('Case unavailable in your project or department scope.',403);
  if(!actionRoles[action]?.includes(p.role))throw new GrievanceError('Your demo role cannot perform this action.',403);

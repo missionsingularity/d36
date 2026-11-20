@@ -1,3 +1,4 @@
+import {systemForImport} from '@/lib/legacy-systems';
 import {NextRequest,NextResponse} from 'next/server';
 import {readStore,transaction,id,StoreBusyError} from '@/lib/store';
 import {ensureGrievances,text} from '@/lib/grievances/service';
@@ -14,8 +15,8 @@ export async function GET(req:NextRequest){try{transaction(s=>ensureGrievances(s
  }catch(e){return error(e)}}
 export async function POST(req:NextRequest){try{const origin=req.headers.get('origin');if(origin&&new URL(origin).host!==req.headers.get('host'))throw new GrievanceError('Cross-origin action denied.',403);const raw=await req.text();if(raw.length>150000)throw new GrievanceError('Request exceeds local import limit.',413);const b=JSON.parse(raw);transaction(s=>ensureGrievances(s));const p=grievanceActor(req);
  if(['link','reconcile'].includes(b.action))return NextResponse.json(linkOrReconcile(p,b));
- const adapter=b.adapter as Adapter,input=text(b.input,'CSV or JSON export',100000),mapping=b.mapping&&typeof b.mapping==='object'?b.mapping:{};
- if(b.action==='preview')return NextResponse.json(previewLegacy(readStore().grievances!,p,adapter,input,mapping));
- if(b.action==='commit'){if(b.confirmed!==true)throw new GrievanceError('Confirm this synthetic export is approved for local demonstration import.');return NextResponse.json(commitLegacy(p,adapter,input,mapping,text(b.requestKey,'Request key',100)))}
+ const adapter=b.adapter as Adapter,input=text(b.input,'CSV or JSON export',100000),mapping=b.mapping&&typeof b.mapping==='object'?b.mapping:{};const system=transaction(s=>systemForImport(s,p,adapter,typeof b.systemId==='string'?b.systemId:undefined));const effectiveMapping={...system.mappingVersions.at(-1)!.mapping,...mapping};
+ if(b.action==='preview')return NextResponse.json(previewLegacy(readStore().grievances!,p,adapter,input,effectiveMapping));
+ if(b.action==='commit'){if(b.confirmed!==true)throw new GrievanceError('Confirm this synthetic export is approved for local demonstration import.');return NextResponse.json(commitLegacy(p,adapter,input,effectiveMapping,text(b.requestKey,'Request key',100)))}
  throw new GrievanceError('Unknown import action.');
  }catch(e){return error(e)}}
