@@ -15,3 +15,33 @@ input[type=checkbox]{accent-color:var(--strong)}
 .settings-card .list-row small { color: var(--muted); }
 .settings-card form > button { margin-top: 16px; }
 .settings-card [role="status"]:empty { display: none; }
+
+.dialog-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.dialog-fields:disabled { opacity: .6; }
+.saving-state { color: var(--muted); margin: 16px 0 0; font-size: 12px; }
+.route-view { min-height: 100%; animation: view-enter 180ms ease-out; }
+.route-view > .new-chat-layout { min-height: calc(100dvh - 102px); }
+@keyframes view-enter {
+  from { opacity: .4; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-view { animation: none; }
+}
+
+.next-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.next-step p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.next-step > button { flex-shrink: 0; }
+@media (max-width: 760px) {
+  .next-step { align-items: flex-start; flex-direction: column; }
+}

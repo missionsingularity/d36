@@ -35,3 +35,9 @@ Typecheck and all 21 engine/settings tests passed. Two Chromium settings journey
 ## Theme navigation fix
 
 Appearance now lives in the root layout provider. Saved appearance is applied before page rendering, and page mounts no longer overwrite it with the default. TypeScript passed. Chromium verified dark appearance across New Chat, Projects, Customize, Documents, My Tasks and Profile, including reloads and switching back to light through the overflow menu.
+
+## Navigation and action-flow refinement
+
+Work records now remember the active tab after navigation and refresh, and the global Work switch returns to the latest permitted record. Route changes close transient menus and clear outdated errors. The overview shows a state-specific next step. Confirmation dialogs provide a saving state, lock their controls until a mutation finishes, and prevent dismissing an in-flight confirmation. A synchronous guard prevents overlapping mutations. Stale refresh responses cannot replace a newer workspace response. Page transitions respect reduced motion.
+
+TypeScript passed. Three Chromium regressions passed: persistent record/tab navigation, single-submit locked confirmation, and unsaved draft preservation after a denied save. The live homepage returned HTTP 200 on port 3000.
