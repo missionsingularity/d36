@@ -4,7 +4,7 @@ import {usePathname,useRouter} from 'next/navigation';
 import {ArrowLeft,Plus,FileText,Download,ArrowUpRight,Shield,Clock,X,Search} from 'lucide-react';
 import type {GrievanceCase,Persona,SlaPolicy} from '@/lib/grievances/types';
 import {stages} from '@/lib/grievances/types';
-import {actionRoles,canReadCase} from '@/lib/grievances/permissions';
+import {actionRoles,canReadCase,authorize} from '@/lib/grievances/permissions';
 type Snapshot={actor:Persona;people:Persona[];cases:GrievanceCase[];total:number;page:number;size:number;summary:{total:number;received:number;assigned:number;inProgress:number;active:number;dueSoon:number;overdue:number;review:number;closed:number;unassigned:number;averageClosureDays:number|null;status:Record<string,number>;department:Record<string,number>;category:Record<string,number>;district:Record<string,number>;months:Record<string,number>};myCases:GrievanceCase[];attention:GrievanceCase[];recent:{id:string;at:string;actor:string;action:string;caseId:string;title:string}[];policies:SlaPolicy[];categories:string[];batches:{id:string;caseIds:string[];reversedAt?:string}[];settingsHistory:{at:string;actor:string;detail:string}[]};
 type Field={name:string;label:string;value?:string;options?:{value:string;label:string}[];type?:string;optional?:boolean};
 type DialogState={title:string;fields?:Field[];save?:(values:Record<string,string>)=>Promise<void>;content?:ReactNode;description?:string};
@@ -27,7 +27,7 @@ export default function GrievanceWorkspace(){
  async function send(body:object|FormData){if(pending.current)throw new Error('A save is already in progress.');pending.current=true;setBusy(true);setError('');try{const res=await fetch(api,{method:'POST',...(body instanceof FormData?{body}:{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}),result=await res.json();if(!res.ok)throw new Error(result.error);window.dispatchEvent(new Event('brahma-state-changed'));return result}catch(e){setError((e as Error).message);throw e}finally{pending.current=false;setBusy(false)}}
  async function mutate(action:string,values:Record<string,unknown>={},source=record){if(!source)return;const result=await send({action,id:source.id,revision:source.revision,...values});setRecord(result.case);setDialog(undefined);await load();setMessage('Changes saved.');return result}
  function form(title:string,action:string,fields:Field[]=[],description?:string){const source=record;setError('');setDialog({title,fields,description,save:async values=>{await mutate(action,values,source)}})}
- const actor=data?.actor,allowed=(action:string)=>!!actor&&actor.member&&actionRoles[action]?.includes(actor.role),officers=data?.people.filter(p=>record&&['officer','supervisor'].includes(p.role)&&canReadCase({...record,sensitivity:'Internal'},p)).map(p=>({value:p.id,label:p.name}))||[];
+ const actor=data?.actor,allowed=(action:string)=>{if(!actor||!actor.member||!actionRoles[action]?.includes(actor.role))return false;if(record&&action!=='create'){try{authorize(record,actor,action)}catch{return false}}return true},officers=data?.people.filter(p=>record&&['officer','supervisor'].includes(p.role)&&canReadCase({...record,sensitivity:'Internal'},p)).map(p=>({value:p.id,label:p.name}))||[];
  const ownerField:Field={name:'owner',label:'Responsible officer',options:officers};
  const latest=record?.decisions.at(-1),isClosed=record&&['Closed','Appeal','Voided'].includes(record.status);
  const openCase=(c:GrievanceCase)=>go(root+'/cases/'+c.id);

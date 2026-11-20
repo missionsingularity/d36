@@ -7,7 +7,7 @@ import {createCase,ensureGrievances,getCase,mutateCase,register,report,text,date
 import {casePdf,historyText,registerCsv,csv,saveAttachment,previewImport,importCases,reverseImport} from '@/lib/grievances/io';
 import type {Persona} from '@/lib/grievances/types';
 export const runtime='nodejs';export const dynamic='force-dynamic';
-export function grievanceActor(req:NextRequest):Persona{
+function grievanceActor(req:NextRequest):Persona{
  if(process.env.DEMO_MODE==='false')throw new GrievanceError('Local demo disabled.',503);
  const state=readStore(),session=state.sessions?.[req.cookies.get('brahma-session')?.value||''];
  if(!session||session.expiresAt<Date.now())throw new GrievanceError('Open the workspace to start a local demo session.',401);
@@ -63,4 +63,5 @@ export async function POST(req:NextRequest){try{
  }
  return NextResponse.json(mutateCase(actor,text(b.id,'Case ID',80),b));
  }catch(e){return error(e)}}
+
 

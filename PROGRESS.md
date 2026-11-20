@@ -59,3 +59,7 @@ Read the full grievance directive. Added backward-compatible grievance state, se
 ## Grievance slice 2 — connected case workspace
 Projects now opens the persisted grievance dashboard and register. Added intake/drafts, seven dossier tabs plus scoped local chat, role controls, evidence inspection, versioned decisions, closure/reopening, tasks, reports, policy/team settings and fixed-format CSV import. Initial Chromium run passed all three new journeys, including complete lifecycle, HTTP denial/import and viewport checks. Tightened theme test to assert actual persisted theme; a full rerun is next. Work links use case-scoped exports; generic chat excludes case data. Typecheck and all 30 combined service tests pass. No unrelated tsconfig.json changes staged.
 
+
+## Grievance slice 3 — access and browser verification
+All four new Chromium grievance journeys passed in the combined regression: full processing/reopen, HTTP scope and import, asserted light/dark responsive routes and keyboard tabs, and case chat-to-Work with original previews, scoped exports and explicit existing-Work links. Production build passed after removing a non-route helper export rejected by Next.js. Remaining old workflow regressions are still running. Operation guide and verification matrix added. Known demo limits: single-process JSON, no production identity/integrations, Latin-only PDF; Unicode TXT remains available.
+
