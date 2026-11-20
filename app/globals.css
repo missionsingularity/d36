@@ -89,3 +89,6 @@ input[type=checkbox]{accent-color:var(--strong)}
 
 /* Theme changes apply foreground and background together to preserve contrast. */
 button, a.button { transition: box-shadow 180ms, transform 180ms; }
+
+.sidebar-more{margin:8px 0;max-height:240px;overflow:auto;flex-shrink:0}.sidebar-more summary{display:flex;align-items:center;gap:14px;cursor:pointer;padding:10px 13px;color:var(--muted)}.sidebar-more nav button{font-size:13px;padding:8px 13px}.sidebar .primary-nav{flex-shrink:0}.sidebar .recent-list{min-height:0}.sidebar .sidebar-bottom{min-height:0;overflow:auto}.workflow-card details{margin:8px 0}.workflow-card .button-row{margin-top:12px}
+@media(max-width:760px){.sidebar-more summary{justify-content:center;padding:10px}.sidebar-more summary span{display:none}.sidebar-more{max-height:160px}}

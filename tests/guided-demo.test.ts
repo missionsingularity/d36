@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {readStore} from '../lib/store';
-import {guidedAction,guidedSnapshot,launchFlagship,ensureGuided} from '../lib/guided-demo';
+import {guidedAction,guidedSnapshot,launchFlagship,restartFlagship,ensureGuided} from '../lib/guided-demo';
 import {transaction} from '../lib/store';
 import {exportRun} from '../lib/exports';
 import {PDFDocument} from 'pdf-lib';
@@ -23,3 +23,4 @@ test('five-scene pension case executes real governed actions, files and closure'
  assert.throws(()=>guidedSnapshot(person('outside'),run.id),/scope/);
 });
 test('typed flagship reference resolves the saved case and cannot bypass separate section review',async()=>{let run=launchFlagship(person('DEMO-U-DA'),'chat-launch');const act=(role:string,action:string)=>{const result=guidedAction(person(role),run.id,{action,revision:run.revision,requestKey:action,reason:'Independent synthetic verification'});run=result.run;return result.case};act('DEMO-U-DA','reconstruct');act('DEMO-U-DA','attach-service');act('DEMO-U-RV','verify');act('DEMO-U-DA','complete-verification');const c=act('DEMO-U-DA','prepare-note');assert.throws(()=>mutateCase(person('DEMO-U-DA'),c.id,{action:'submit',revision:c.revision}),/section review/);let thread=await agentMessage(person('DEMO-U-DA'),'Open demo grievance DEMO-GRV-2026-0042 and show its timeline.');assert.equal(thread.caseId,c.id);thread=await agentMessage(person('DEMO-U-DA'),'Send the current draft for review.',c.id,thread.id);const proposal=thread.messages.at(-1)!.proposal!;assert.equal(proposal.tool,'guided');confirmAgent(person('DEMO-U-DA'),thread.id,proposal.id);assert.equal(readStore().guided!.runs[0].review?.status,'Pending');assert.equal(readStore().grievances!.cases.find(x=>x.id===c.id)!.status,'In progress')});
+test('safe restart retains selected originals and unrelated work; retry creates only one new namespace',()=>{const p=person('DEMO-U-DA'),old=launchFlagship(p,'old'),unrelated=launchFlagship(p,'unrelated'),before=readStore().grievances!.cases.find(c=>c.id===old.caseId)!.attachments.map(a=>a.hash);assert.throws(()=>restartFlagship(person('DEMO-U-OB'),old.id,'restart'),/owner/);const next=restartFlagship(p,old.id,'restart');assert.notEqual(next.caseId,old.caseId);assert.equal(restartFlagship(p,old.id,'restart').id,next.id);const state=readStore();assert.equal(state.guided!.runs.length,3);assert.ok(state.guided!.runs.some(r=>r.id===unrelated.id&&!r.paused));assert.deepEqual(state.grievances!.cases.find(c=>c.id===old.caseId)!.attachments.map(a=>a.hash),before)});

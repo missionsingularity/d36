@@ -39,3 +39,6 @@ Added source-driven variants for the other nine preserved operations under Custo
 
 ## New ten-scenario browser checkpoint
 The clean 11-test run passed in 1.5 minutes: six-stage builder, five-scene flagship and all nine new source-driven examples. Every scenario opened actual cited originals, survived refresh and generated all five formats; unrelated actors were denied derived exports/mutations. Outgoing page content is now inert during route transitions, preventing source-preview clicks from being lost. Current application code is still being extended for remaining navigation/connector/rule requirements; this is not full-spec completion.
+
+## Connected workspace controls
+Added scoped Approvals, People and Reports pages and grouped secondary sidebar navigation. Added server-enforced Work Pause/Resume/Cancel that retain documents and history. Added UI safe restart for guided runs: creates a new case namespace, pauses the prior run, retains originals/unrelated work, and retries return the same new run. Three guided service tests pass, including safe restart. The prior complete npm test run passed 55 tests; the newly added restart test will be included in the final run. Remaining work includes connector registration, advanced builder rules and detailed scenario interaction coverage before declaring full specification completion.
