@@ -40,3 +40,11 @@ Final reviewed changes are committed and pushed to the official origin/main; rem
 Live Gemini planning awaits the user's API key. No key is requested or fabricated. Detailed differences from the complete enterprise vision are explicit in KNOWN_LIMITATIONS.md; this is a working local prototype, not full enterprise administration or production authentication.
 
 Verification and push results are recorded as completed, never inferred from page existence.
+
+## Follow-up: Gemini request errors
+
+The latest saved failures were actual Google 503 high-demand and 504 deadline responses. Added bounded retries (three total attempts, exponential backoff and jitter, 45 seconds per attempt), disabled nested SDK retries, removed deprecated sampling settings, increased structured-output capacity, and updated the default model to gemini-3.8-flash. Billing, credential and unavailable-model errors now have distinct readable messages; raw Google errors are not shown. A failed chat without a created draft offers a Retry request action. The composer stays busy while the initial request is pending.
+
+Development output now uses `.next-dev`, production uses `.next`, and browser tests retain their own explicit output directory, preventing simultaneous dev/build commands from overwriting chunks. TypeScript excludes generated development files.
+
+Validation: 19 enterprise/Gemini regression tests passed, all three browser scenarios passed, formatting and type checks passed, and the production build passed while development was running. Live Gemini planning/local search had previously succeeded; upstream outages are not represented as successful execution.

@@ -22,7 +22,7 @@ Open `.env.local` in this project's root:
 
 ```dotenv
 GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.8-flash
 ```
 
 Get a key from https://aistudio.google.com/apikey. Keep it private. This file is ignored by Git. Stop the running server with Ctrl+C and run `npm.cmd run dev` again. Settings includes the same instructions. A configured key enables LIVE GEMINI planning; a rejected key creates a visible failed workflow. Live service behavior has not been verified with your account.

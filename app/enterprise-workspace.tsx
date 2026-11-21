@@ -287,7 +287,6 @@ export default function EnterpriseWorkspace() {
     if (!text.trim() || busy) return;
     const value = text;
     setPrompt("");
-    go("chat" + (section === "chat" && chat ? "/" + chat.id : ""));
     try {
       const out = await post({
         action: "chat",
@@ -798,6 +797,14 @@ export default function EnterpriseWorkspace() {
                               ))}
                             </div>
                             <div className="message-links">
+                              {w.status === "Failed" && !w.documentId && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => send(w.objective)}
+                                >
+                                  Retry request
+                                </button>
+                              )}
                               <button onClick={() => go("work/" + w.id)}>
                                 <Briefcase size={15} />
                                 Open in Work

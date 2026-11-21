@@ -1,6 +1,6 @@
 # Known limitations
 
-- A real Gemini response cannot be verified until you add your own key. Official SDK requests, strict schema validation and credential/network/schema error handling are verified with intercepted synthetic responses; offline workflows are tested independently. AC02's live-service check remains pending.
+- Live Gemini planning and a permitted local search have been verified using the user-configured key. Google can still return temporary high-demand or deadline errors. Planning retries transient failures at most three times, with a 45-second timeout per attempt and exponential backoff; persistent failures remain visible. Credentials, billing and unavailable-model errors require configuration changes and are not retried automatically.
 - The app is a standalone local prototype with fictional identities, not a deployable enterprise security system. Role switching is deliberately enabled in `.env.local`; bind only to loopback. There is no SSO, MFA, multi-tenant administration or production account enrollment.
 - Offline natural-language handling supports local search and predefined Alpha replacement/report workflows. It is not a general model. Unknown requests return retrieved records rather than invented answers.
 - Seeded projects and tasks support progress, memberships and dependency checks. Full milestone CRUD, arbitrary task dependencies, maintenance scheduling, asset reassignment and onboarding checklist editing are not implemented.

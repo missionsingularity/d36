@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_GEMINI_MODEL } from "./gemini";
 import {
   db,
   atomic,
@@ -589,7 +590,7 @@ export function snapshot(u: Employee): Snapshot {
       ).payload,
     ),
     mode: process.env.GEMINI_API_KEY ? "LIVE GEMINI" : "OFFLINE LOCAL MODE",
-    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    model: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
     searchHistory: (
       db()
         .prepare(
