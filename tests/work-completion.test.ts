@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {seedDemoWorld} from '../lib/demo-world';
-import {executeScenario} from '../lib/realistic-scenarios';
-import {governedRunAction} from '../lib/run-policy';
-import {readStore,dataDir} from '../lib/store';
-import {mutateCase} from '../lib/grievances/service';
+import {seedDemoWorld} from './legacy-support/demo-world';
+import {executeScenario} from './legacy-support/realistic-scenarios';
+import {governedRunAction} from './legacy-support/run-policy';
+import {readStore,dataDir} from './legacy-support/store';
+import {mutateCase} from './legacy-support/grievances/service';
 
 test('source-backed work requires an independent local receipt, proof and authority for closure',async()=>{
  const previous=process.env.BRAHMA_DATA_DIR,dir=fs.mkdtempSync(path.join(os.tmpdir(),'brahma-completion-'));

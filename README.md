@@ -1,38 +1,69 @@
-# BrahmaGPT
+﻿# BrahmaGPT by Singularity
 
-A desktop-first, monochrome government-work demonstrator. All seeded records are synthetic, not government rules. Built as a single Next.js application; no paid AI API, Docker, or separate backend required.
+A local enterprise workspace with a search-first interface, Gemini tool planning, SQLite FTS5, linked IT/Projects/HR records, immutable documents, independent approvals and real execution receipts. All seeded people and policies are fictional.
 
-## Local development
+## Start on Windows
 
-Node.js 22 or later. In PowerShell use `npm.cmd` when script execution policy prevents `npm`.
+Requires Node.js 22.15 or later and npm. Use `npm.cmd` in PowerShell if script execution policy blocks `npm`.
 
-```sh
-npm install
-npm run dev
+```powershell
+cd C:\Users\spond\Singularity\d36
+npm.cmd ci
+npm.cmd run setup
+npm.cmd run seed
+npm.cmd run dev
 ```
 
-Open http://127.0.0.1:3000. Choose **Customize** to launch any of the ten workflows. Use **Open in Work** to inspect evidence, manage decisions and download outputs. Run `npm run typecheck`, `npm test`, `npm run build`, and `npm run test:e2e` for verification. Playwright uses an isolated demo store and requires Chromium (`npx playwright install chromium`). See [PROJECT_STATUS.md](PROJECT_STATUS.md) for test results and demo limits.
+Open http://127.0.0.1:3000. The database seeds automatically on first use, so `seed` is optional. Setup preserves any existing `.env.local` and all data. No Docker or enterprise API account is required.
 
-## Typed chat and project members
+## Add your Gemini API key later
 
-The New Chat composer executes local record queries on the server and retains conversation history. Supported examples include find documents about pension, show overdue tasks, and show pending approvals. The deterministic path is explicitly labelled. A remote model adapter is still pending.
+Open `.env.local` in this project's root:
 
-Projects supports a local member picker and avatar stacks, duplicate prevention and last-owner protection. General project labels are separate from the grievance module's server-enforced department/district/case permissions. Demo identities resolve from opaque server-side sessions. Profile switches the original personas; Grievance has an explicit local role selector.
+```dotenv
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-2.5-flash
+```
 
-Use .env.example for optional local settings. Runtime records remain in the ignored .data directory. The local SQLite store uses Node 22's built-in `node:sqlite`, which emits an experimental warning. Existing JSON is retained with a pre-migration backup. This is not a production multi-host database.
+Get a key from https://aistudio.google.com/apikey. Keep it private. This file is ignored by Git. Stop the running server with Ctrl+C and run `npm.cmd run dev` again. Settings includes the same instructions. A configured key enables LIVE GEMINI planning; a rejected key creates a visible failed workflow. Live service behavior has not been verified with your account.
 
-## Grievance Operations
+Leave the key blank to use OFFLINE LOCAL MODE. Local search, predefined Alpha replacement/report workflows, editing, project creation, leave requests, imports and authorized approvals work without it.
 
-Open `/projects/grievance` for internal intake, scoped case teams, typed relationships, preserved evidence versions, requirements/conflicts, tasks and follow-ups. Three local CSV/JSON adapters retain canonical source snapshots and import reports. Proposal approval is separate from ATR/reply review, manual submission proof, independent acknowledgement, appeals, disposal and closure. Nothing sends to a government service.
+## Try the complete local workflow
 
-Typed case Chat stages supported changes for confirmation against the same backend as Work. Permitted originals and extracted text appear in Documents; case assignments appear in My Tasks. The original ten demonstrations and five output formats remain available.
+1. As Maya, ask: `Find unresolved laptop issues affecting Project Alpha, check the replacement policy, prepare requests and send to the IT Manager for approval.`
+2. Inspect the citations, real execution timeline and saved draft.
+3. In Settings switch to Arjun Mehta (IT Manager).
+4. Open Approvals, approve the exact version, then execute the approved action.
+5. Inspect the procurement record and receipt. Refresh to confirm persistence. No external procurement order is sent.
 
-See the [reviewer script](docs/GRIEVANCE_DEMO.md), [architecture](docs/GRIEVANCE_ARCHITECTURE.md), [API](docs/GRIEVANCE_API.md), [import guide](docs/LEGACY_IMPORT_GUIDE.md) and [acceptance report](GRIEVANCE_TEST_REPORT.md). Keep confidential records and credentials out of this demonstration.
+For HR leave approval use Leah Chen. Sam Patel administers workspace configuration and CSV import. Demo role switching is enabled by `DEMO_MODE=true`; these identities are not production authentication. The server binds to loopback.
 
-## Customize v2 demonstration
+## Commands
 
-Open Customize and **Try pension example** for the five-scene persistent case. Select fictional roles inside the scene view to inspect sources, verify records, edit the note, obtain separate review/approval, dispatch only to a local demo inbox, complete follow-up and close. Saved runs can be resumed after refresh. The **Examples** tab creates source-driven variants of the other nine operations. `/workflows` contains the six-stage draft/version/publish editor.
+```powershell
+npm.cmd run typecheck
+npm.cmd run lint
+npm.cmd test
+npm.cmd run test:e2e
+npm.cmd run test:legacy
+npm.cmd run build
+npm.cmd start
+```
 
-Use `npm.cmd run demo:seed` for the shared synthetic PDF/DOCX source world. `npm.cmd run demo:reset -- <guided-run-id>` creates a new example namespace and retains all prior records and exports. Outputs are content-addressed files under `.data/exports`; download links return generated bytes. Original documents stay under `.data/grievance-evidence`. Do not publish either directory or the SQLite database.
+Install Chromium with `npx.cmd playwright install chromium` if absent. Browser tests run their own isolated server on port 3100 and save screenshots under `.qa/`. `lint` validates formatting; TypeScript supplies static type checking. `test:legacy` retains the original government-domain service regressions, without exposing the retired application or APIs.
 
-See [five-scene walkthrough](docs/DEMO_WALKTHROUGH.md), [actual demo test results](docs/DEMO_TEST_RESULTS.md), [workflow implementation guide](docs/CUSTOMIZE_WORKFLOWS.md) and [current incomplete scope](IMPLEMENTATION_STATUS.md). These results distinguish the working local demonstration from still-pending specification details. No external AI key is required.
+## Files and recovery
+
+- `.env.local`: local server credentials; never committed.
+- `.data/enterprise.sqlite`: live enterprise database; never committed. Existing prior databases are untouched.
+- `lib/enterprise/`: retrieval, deterministic calculations, tool planner, governed execution and CSV import.
+- `app/enterprise-workspace.tsx` and `app/enterprise.css`: one active interface and design system.
+- `tests/legacy-support/`: historical synthetic fixtures and services for regression tests only.
+- `checkpoint/pre-enterprise-rebuild-20261122`: original code checkpoint in Git. Ignored `recovery-before-rebuild.bundle` is a verified full-history local backup.
+
+For a cold backup stop the server and copy the entire `.data` directory, including any SQLite WAL files. Never commit that directory. Back up `.env.local` privately if needed.
+
+See [Architecture](docs/ARCHITECTURE.md), [demonstrations](docs/DEMO_SCENARIOS.md), [acceptance evidence](docs/ACCEPTANCE_TESTS.md), [design references](docs/DESIGN_REFERENCES.md), [rebuild audit](docs/REBUILD_AUDIT.md), [progress](docs/IMPLEMENTATION_PROGRESS.md) and [known limitations](docs/KNOWN_LIMITATIONS.md). The older root status reports describe the retired government demonstration; current rebuild evidence is in these docs.
+
+This is a working bounded prototype, not every feature of the full enterprise vision. Plain-text editing, Latin-font PDF export, predefined offline planning and local demo identities are deliberate current limits. Advanced administration, maintenance scheduling and complete onboarding workflows remain incomplete.

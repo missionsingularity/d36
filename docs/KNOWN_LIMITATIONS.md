@@ -1,0 +1,13 @@
+# Known limitations
+
+- A real Gemini response cannot be verified until you add your own key. SDK requests, strict schema validation and error handling are implemented; offline workflows are tested independently. AC02's live-service check remains pending.
+- The app is a standalone local prototype with fictional identities, not a deployable enterprise security system. Role switching is deliberately enabled in `.env.local`; bind only to loopback. There is no SSO, MFA, multi-tenant administration or production account enrollment.
+- Offline natural-language handling supports local search and predefined Alpha replacement/report workflows. It is not a general model. Unknown requests return retrieved records rather than invented answers.
+- Seeded projects and tasks support progress, memberships and dependency checks. Full milestone CRUD, arbitrary task dependencies, maintenance scheduling, asset reassignment and onboarding checklist editing are not implemented.
+- Workspace configuration supports persisted departments, built-in roles, reviewer configuration, templates, module navigation and custom-field definitions. Arbitrary custom role permissions, dynamic custom-field rendering and a general visual workflow builder remain outside this implementation. Workflow template entries launch predefined instructions.
+- Document editing is plain text/Markdown, with preserved versions and side-by-side comparison. It is not rich text or a semantic diff. Attach supports UTF-8 TXT/MD/CSV up to 1 MB; PDF/DOCX ingestion and binary attachment preservation are not implemented. PDF export uses built-in Latin fonts and substitutes unsupported characters; DOCX retains Unicode.
+- Source citations reference stored records and versions. No unverified page numbers are invented. Chat evidence is shown as clickable source chips rather than generated prose footnotes. No model-written prose synthesis is currently performed; the model plans tools and deterministic output reports their results.
+- SQLite is one-machine storage. Backups, managed retention, malware scanning and distributed background execution are not configured. Workflow execution is bounded and synchronous; there is no job queue.
+- Original government UI and API are retired from the active app. Historical tests and support libraries are retained separately for regression evidence. Their original browser selectors describe the retired interface, not the new enterprise UI.
+
+These are explicit differences from the full supplied vision; page existence is not evidence that an unimplemented feature works.

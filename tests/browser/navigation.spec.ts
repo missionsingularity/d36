@@ -1,5 +1,5 @@
 import {expect,test} from '@playwright/test';
-import {workflows} from '../../lib/catalog';
+import {workflows} from '../legacy-support/catalog';
 
 test('New Chat, citation preview, notifications and local sharing stay connected', async ({page}) => {
   await page.goto('/');

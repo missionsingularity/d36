@@ -3,8 +3,8 @@ import {PDFDocument} from 'pdf-lib';
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import {test,expect} from '@playwright/test';
-import {sources,workflows} from '../../lib/catalog';
-import type {Run} from '../../lib/types';
+import {sources,workflows} from '../legacy-support/catalog';
+import type {Run} from '../legacy-support/types';
 
 const formats = ['PDF','DOCX','XLSX','PPTX','TXT'] as const;
 const normalize = (s:string) => s.replace(/\s+/g,' ').trim();

@@ -6,10 +6,10 @@ import os from 'node:os';
 import {PDFDocument} from 'pdf-lib';
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
-import {launch,act,sourceAllowed,assertRun} from '../lib/engine';
-import {readStore,transaction,hash} from '../lib/store';
-import {sources,workflows} from '../lib/catalog';
-import {seedFiles,exportRun} from '../lib/exports';
+import {launch,act,sourceAllowed,assertRun} from './legacy-support/engine';
+import {readStore,transaction,hash} from './legacy-support/store';
+import {sources,workflows} from './legacy-support/catalog';
+import {seedFiles,exportRun} from './legacy-support/exports';
 before(()=>{process.env.BRAHMA_DATA_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'brahma-test-'))});
 function rejectUnchanged(fn:()=>unknown){const before=JSON.stringify(readStore().runs);assert.throws(fn);assert.equal(JSON.stringify(readStore().runs),before)}
 function approved(id=6){let r=launch(id,'officer');if(id===3)r=act(r.id,{type:'correct',value:'18',reason:'Demo officer reviewed the region'},'officer');act(r.id,{type:'request-review'},'officer');return act(r.id,{type:'approve',version:r.versions.length,reason:'Reviewed synthetic packet; limitations retained'},'reviewer')}
@@ -66,7 +66,7 @@ test('planning XLSX includes the private scenario without changing baseline due 
 });
 
 test('profile patches retain fields, isolate personas and reject invalid values',async()=>{
-  const {settingsFor,updateSettings}=await import('../lib/settings');
+  const {settingsFor,updateSettings}=await import('./legacy-support/settings');
   const state=readStore();
   updateSettings(state,'officer',{name:'Sample Officer',email:'sample@example.invalid'});
   updateSettings(state,'officer',{language:'Hindi',notifications:false});
@@ -82,7 +82,7 @@ test('profile patches retain fields, isolate personas and reject invalid values'
 });
 
 test('PDF and DOCX uploads extract actual text and retain page markers',async()=>{
-  const {extractOriginal}=await import('../lib/extraction');
+  const {extractOriginal}=await import('./legacy-support/extraction');
   const {Document,Paragraph,Packer}=await import('docx');
   const pdf=await PDFDocument.create();
   pdf.addPage().drawText('Synthetic pension proposal pending annexure');
@@ -98,7 +98,7 @@ test('PDF and DOCX uploads extract actual text and retain page markers',async()=
 });
 
 test('chat uses persisted tasks and denies cross-persona conversation continuation',async()=>{
-  const {sendMessage}=await import('../lib/chat');
+  const {sendMessage}=await import('./legacy-support/chat');
   const run=launch(5,'officer');
   const thread=sendMessage('officer','show my overdue tasks');
   assert.match(thread.messages.at(-1)!.text,/Verify annexure/);
