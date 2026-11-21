@@ -14,6 +14,8 @@
     "demo:reset": "tsx scripts/demo-world.ts --restart"
   },
   "dependencies": {
+    "@google/genai": "^3.6.1",
+    "@tailwindcss/postcss": "^4.3.5",
     "docx": "^9.5.1",
     "exceljs": "^4.4.0",
     "lucide-react": "^0.468.0",
@@ -21,7 +23,9 @@
     "pdf-lib": "^1.17.1",
     "pptxgenjs": "^4.0.1",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "tailwindcss": "^4.3.5",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",

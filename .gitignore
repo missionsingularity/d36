@@ -1,4 +1,7 @@
 node_modules/
+recovery-before-rebuild.bundle
+.npm-cache/
+.qa/
 .next/
 .next-test/
 .next-build*/
