@@ -64,6 +64,6 @@ Install Chromium with `npx.cmd playwright install chromium` if absent. Browser t
 
 For a cold backup stop the server and copy the entire `.data` directory, including any SQLite WAL files. Never commit that directory. Back up `.env.local` privately if needed.
 
-See [Architecture](docs/ARCHITECTURE.md), [demonstrations](docs/DEMO_SCENARIOS.md), [acceptance evidence](docs/ACCEPTANCE_TESTS.md), [design references](docs/DESIGN_REFERENCES.md), [rebuild audit](docs/REBUILD_AUDIT.md), [progress](docs/IMPLEMENTATION_PROGRESS.md) and [known limitations](docs/KNOWN_LIMITATIONS.md). The older root status reports describe the retired government demonstration; current rebuild evidence is in these docs.
+See [Architecture](docs/ARCHITECTURE.md), [demonstrations](docs/DEMO_SCENARIOS.md), [acceptance evidence](docs/ACCEPTANCE_TESTS.md), [design references](docs/DESIGN_REFERENCES.md), [rebuild audit](docs/REBUILD_AUDIT.md), [progress](docs/IMPLEMENTATION_PROGRESS.md) and [known limitations](docs/KNOWN_LIMITATIONS.md). Historical status reports are preserved in docs/archive; current rebuild evidence is in these docs.
 
 This is a working bounded prototype, not every feature of the full enterprise vision. Plain-text editing, Latin-font PDF export, predefined offline planning and local demo identities are deliberate current limits. Advanced administration, maintenance scheduling and complete onboarding workflows remain incomplete.

@@ -10,11 +10,8 @@
     "test": "tsx --test tests/enterprise.test.ts tests/gemini.test.ts",
     "test:e2e": "playwright test --config playwright.enterprise.config.ts",
     "seed": "tsx scripts/enterprise-seed.ts",
-    "demo:seed": "tsx scripts/demo-world.ts",
-    "demo:reset": "tsx scripts/demo-world.ts --restart",
     "test:legacy": "tsx --test tests/engine.test.ts tests/grievances.test.ts tests/guided-demo.test.ts tests/workflow-templates.test.ts tests/demo-world.test.ts tests/sqlite-store.test.ts tests/realistic-scenarios.test.ts tests/legacy-systems.test.ts tests/run-policy.test.ts tests/work-completion.test.ts",
     "setup": "node scripts/setup.mjs",
-    "seed:legacy": "tsx scripts/seed.ts",
     "lint": "prettier --check app lib/enterprise tests/enterprise.test.ts tests/gemini.test.ts tests/enterprise-browser playwright.enterprise.config.ts postcss.config.mjs scripts/setup.mjs scripts/enterprise-seed.ts"
   },
   "dependencies": {

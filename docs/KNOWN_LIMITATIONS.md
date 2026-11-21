@@ -8,6 +8,6 @@
 - Document editing is plain text/Markdown, with preserved versions and side-by-side comparison. It is not rich text or a semantic diff. Attach supports UTF-8 TXT/MD/CSV up to 1 MB; PDF/DOCX ingestion and binary attachment preservation are not implemented. PDF export uses built-in Latin fonts and substitutes unsupported characters; DOCX retains Unicode.
 - Source citations reference stored records and versions. No unverified page numbers are invented. Chat evidence is shown as clickable source chips rather than generated prose footnotes. No model-written prose synthesis is currently performed; the model plans tools and deterministic output reports their results.
 - SQLite is one-machine storage. Backups, managed retention, malware scanning and distributed background execution are not configured. Workflow execution is bounded and synchronous; there is no job queue.
-- Original government UI and API are retired from the active app. Historical tests and support libraries are retained separately for regression evidence. Their original browser selectors describe the retired interface, not the new enterprise UI.
+- Original government UI and API are retired from the active app. Historical unit tests and support libraries are retained separately for regression evidence. Obsolete browser specifications were removed; the current enterprise browser tests remain.
 
 These are explicit differences from the full supplied vision; page existence is not evidence that an unimplemented feature works.

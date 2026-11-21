@@ -1,3 +1,0 @@
-import {defineConfig} from '@playwright/test';
-const production=process.env.BRAHMA_E2E_PRODUCTION==='1';
-export default defineConfig({testDir:'./tests/browser',workers:1,timeout:90000,expect:{timeout:15000},use:{baseURL:'http://127.0.0.1:3100',viewport:{width:1440,height:900},trace:'retain-on-failure'},webServer:{command:production?'npm run start -- --port 3100':'npm run dev -- --port 3100',url:'http://127.0.0.1:3100/api/demo?kind=health',timeout:120000,reuseExistingServer:false,env:{NEXT_DIST_DIR:production?'.next-build-grievance-final':'.next-test',BRAHMA_DATA_DIR:'.test-data/browser-'+Date.now()}},reporter:[['list'],['html',{open:'never'}]]});
