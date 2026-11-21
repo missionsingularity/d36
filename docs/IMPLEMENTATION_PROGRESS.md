@@ -48,3 +48,5 @@ The latest saved failures were actual Google 503 high-demand and 504 deadline re
 Development output now uses `.next-dev`, production uses `.next`, and browser tests retain their own explicit output directory, preventing simultaneous dev/build commands from overwriting chunks. TypeScript excludes generated development files.
 
 Validation: 19 enterprise/Gemini regression tests passed, all three browser scenarios passed, formatting and type checks passed, and the production build passed while development was running. Live Gemini planning/local search had previously succeeded; upstream outages are not represented as successful execution.
+
+Final live verification: Google continued returning 503 for the selected 3.8 Flash model even after bounded retries. Listed project-accessible models, verified structured output with 3.5 Flash Lite and selected it through the private local GEMINI_MODEL override. Replaced the leftover development process with the tested production server. A complete live request returned HTTP 200, validated a registered-tool plan, completed SQLite search and returned seven permitted sources. Existing failed workflow history was preserved.
