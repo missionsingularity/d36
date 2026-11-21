@@ -17,4 +17,4 @@ All people, policies and records are fictional. Start as Maya Rao. Switch local 
 
 Additional checks: unauthorized conversations; stale base version; old approval after a new draft; task dependencies; bad leave dates; search type filter; cross-origin request rejection; PDF/DOCX signature bytes; refresh persistence; dark theme; mobile drawer and overflow.
 
-Service scenario checks have passed. Browser verification is in progress; consult IMPLEMENTATION_PROGRESS.md for final results. Live Gemini planning cannot pass until a user key is supplied.
+Service scenario checks and all three browser tests passed. Synthetic intercepted SDK responses also verify structured planning and model failure handling; consult IMPLEMENTATION_PROGRESS.md for final results. Live Gemini planning cannot pass until a user key is supplied.

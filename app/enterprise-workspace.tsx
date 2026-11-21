@@ -612,9 +612,21 @@ export default function EnterpriseWorkspace() {
             <p className="eyebrow">YOUR WORK, CONNECTED</p>
             <h1>
               Good{" "}
-              {new Date().getHours() < 12
+              {Number(
+                new Intl.DateTimeFormat("en-GB", {
+                  hour: "numeric",
+                  hourCycle: "h23",
+                  timeZone: "Asia/Kolkata",
+                }).format(new Date()),
+              ) < 12
                 ? "morning"
-                : new Date().getHours() < 17
+                : Number(
+                      new Intl.DateTimeFormat("en-GB", {
+                        hour: "numeric",
+                        hourCycle: "h23",
+                        timeZone: "Asia/Kolkata",
+                      }).format(new Date()),
+                    ) < 17
                   ? "afternoon"
                   : "evening"}
               , {data.user.name.split(" ")[0]}

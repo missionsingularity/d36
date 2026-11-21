@@ -83,6 +83,14 @@ test("primary workflow, exact approval, exports, search, persistence and visual 
     .last()
     .click();
   await expect(page.locator(".search-results")).toContainText("product brief");
+  await expect
+    .poll(async () => {
+      const types = await page
+        .locator(".search-results .row-top > .muted")
+        .allTextContents();
+      return types.length > 0 && types.every((type) => type === "Documents");
+    })
+    .toBe(true);
   await page.screenshot({
     path: screen + "/search-results.png",
     fullPage: true,

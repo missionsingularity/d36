@@ -31,12 +31,14 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    ".next-test/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-build-live/types/**/*.ts"
+    ".next-test/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next-test",
+    ".next-build-live",
+    ".next-build-grievance-final"
   ]
 }
