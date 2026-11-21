@@ -1,4 +1,4 @@
-import {DatabaseSync} from 'node:sqlite';
+import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID,createHash} from 'node:crypto';
@@ -7,11 +7,11 @@ import type {Employee,RecordItem} from './types';
 export const uid=()=>randomUUID();
 export const timestamp=()=>new Date().toISOString();
 export const digest=(s:string)=>createHash('sha256').update(s).digest('hex');
-let connection:DatabaseSync|undefined;
+let connection:Database.Database|undefined;
 export function db(){
  if(connection)return connection;
  const dir=path.resolve(process.env.BRAHMA_DATA_DIR||'.data');fs.mkdirSync(dir,{recursive:true});
- const c=new DatabaseSync(path.join(dir,'enterprise.sqlite'));c.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
+ const c=new Database(path.join(dir,'enterprise.sqlite'));c.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
  c.exec(`CREATE TABLE IF NOT EXISTS migrations(version INTEGER PRIMARY KEY,applied TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS employees(id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT UNIQUE NOT NULL,department TEXT NOT NULL,role TEXT NOT NULL,leaveBalance REAL NOT NULL);
  CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES employees(id),expires INTEGER NOT NULL);
@@ -46,10 +46,9 @@ export function atomic<T>(fn:()=>T):T{const c=db();c.exec('BEGIN IMMEDIATE');try
 export function log(actor:string,action:string,detail:string){db().prepare('INSERT INTO audit VALUES(?,?,?,?,?)').run(uid(),actor,action,detail,timestamp())}
 export function notify(userId:string,text:string){db().prepare('INSERT INTO notifications(id,userId,text,created) VALUES(?,?,?,?)').run(uid(),userId,text,timestamp())}
 export function record(row:Record<string,unknown>):RecordItem{return {...row,data:JSON.parse(row.data as string)} as RecordItem}
-export function putRecord(r:RecordItem){db().prepare('INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(r.id,r.type,r.title,r.body,r.department,r.owner,r.project||null,r.status,r.updated,JSON.stringify(r.data))}
 // Correct table order is explicit, making migrations independent of insert position.
 export function insertRecord(r:RecordItem){db().prepare('INSERT INTO records(id,type,title,body,department,owner,project,status,updated,data) VALUES(?,?,?,?,?,?,?,?,?,?)').run(r.id,r.type,r.title,r.body,r.department,r.owner,r.project||null,r.status,r.updated,JSON.stringify(r.data))}
-function seed(c:DatabaseSync){
+function seed(c:Database.Database){
  c.exec('BEGIN IMMEDIATE');try{
  const users:Employee[]=[{id:'maya',name:'Maya Rao',email:'maya@singularity.example',department:'Engineering',role:'employee',leaveBalance:18},{id:'arjun',name:'Arjun Mehta',email:'arjun@singularity.example',department:'IT',role:'it_manager',leaveBalance:20},{id:'leah',name:'Leah Chen',email:'leah@singularity.example',department:'HR',role:'hr_manager',leaveBalance:22},{id:'sam',name:'Sam Patel',email:'sam@singularity.example',department:'Operations',role:'admin',leaveBalance:16},{id:'noah',name:'Noah Williams',email:'noah@singularity.example',department:'Engineering',role:'employee',leaveBalance:15}];
  for(const u of users)c.prepare('INSERT INTO employees VALUES(?,?,?,?,?,?)').run(u.id,u.name,u.email,u.department,u.role,u.leaveBalance);

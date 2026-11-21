@@ -1,0 +1,2 @@
+import {defineConfig} from '@playwright/test';
+export default defineConfig({testDir:'./tests/enterprise-browser',workers:1,timeout:60000,expect:{timeout:15000},use:{baseURL:'http://127.0.0.1:3100',viewport:{width:1440,height:1000},trace:'retain-on-failure'},webServer:{command:'npm.cmd run dev -- --port 3100',url:'http://127.0.0.1:3100/api/workspace',timeout:120000,reuseExistingServer:false,env:{NEXT_DIST_DIR:'.next-test',BRAHMA_DATA_DIR:'.test-data/enterprise-browser-'+Date.now(),DEMO_MODE:'true',GEMINI_API_KEY:''}},reporter:[['list'],['html',{open:'never'}]]});
