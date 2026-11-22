@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   ChevronRight,
   CalendarDays,
-  Megaphone,
   X,
   BookOpen,
   ListTodo,
@@ -25,7 +24,6 @@ export default function WorkspaceHome({
   onSearch,
   onAgent,
   onTaskToggle,
-  heroMark,
   busy,
   compact = false,
 }: {
@@ -37,7 +35,6 @@ export default function WorkspaceHome({
   onSearch: (value: string) => void;
   onAgent: (agent: WorkAgent) => void;
   onTaskToggle: (record: RecordItem) => void;
-  heroMark: ReactNode;
   busy: boolean;
   compact?: boolean;
 }) {
@@ -75,22 +72,22 @@ export default function WorkspaceHome({
   const approvals = data.approvals.filter(
     (a) => a.status === "PENDING_APPROVAL",
   );
+  const openTasks = tasks.filter((task) => task.status !== "Done").length;
   const policy =
     data.records.find((r) => r.id === "policy-it") ||
     documents.find((r) => r.data.policy);
   return (
     <div className={"enterprise-home " + (compact ? "new-conversation" : "")}>
       <section className="assistant-hero" aria-labelledby="assistant-question">
-        <div className="assistant-emblem">{heroMark}</div>
         <h2 className="assistant-greeting">
           Good {hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening"},{" "}
           {data.user.name.split(" ")[0]}.
         </h2>
         <p>
-          Here’s what’s happening at{" "}
-          {String(data.settings.workspace || "Singularity")}.
+          {openTasks} {openTasks === 1 ? "open task" : "open tasks"},{" "}
+          {approvals.length} pending approvals
         </p>
-        <h1 id="assistant-question">What can I help you accomplish?</h1>
+        <h1 id="assistant-question">Search or start a task</h1>
       </section>
       <div className="hub-composer">{composer}</div>
       <div className="hub-suggestions" aria-label="Suggested actions">
@@ -134,10 +131,10 @@ export default function WorkspaceHome({
         <>
           {showPolicy && policy && (
             <div className="company-spotlight">
-              <Megaphone size={21} />
-              <strong>Policy spotlight</strong>
+              <BookOpen size={21} />
+              <strong>Policy</strong>
               <span>{policy.title}</span>
-              <small>Available in your organization knowledge</small>
+
               <button onClick={() => openRecord(policy)}>View policy</button>
               <button
                 className="dismiss-spotlight"
@@ -158,7 +155,7 @@ export default function WorkspaceHome({
               <div className="hub-section-heading">
                 <h2>
                   <ListTodo size={20} />
-                  My relevant tasks
+                  My tasks
                 </h2>
                 <button onClick={() => go("work")}>
                   View all tasks
@@ -230,16 +227,12 @@ export default function WorkspaceHome({
                 {tasks.length === 0 && approvals.length === 0 && (
                   <div className="hub-empty">
                     <CheckCircle2 size={22} />
-                    <strong>You’re all caught up</strong>
+                    <strong>No assigned tasks</strong>
                     <p>
                       Assigned tasks and approval requests will appear here.
                     </p>
                   </div>
                 )}
-                <div className="panel-footer">
-                  <ShieldCheck size={13} />
-                  Tasks and approvals from your connected workspace
-                </div>
               </div>
             </section>
             <section className="organization-knowledge">
@@ -284,7 +277,7 @@ export default function WorkspaceHome({
                 {documents.length === 0 && (
                   <div className="hub-empty">
                     <BookOpen size={22} />
-                    <strong>Your company knowledge, together</strong>
+                    <strong>No documents available</strong>
                     <p>Saved and imported documents will appear here.</p>
                   </div>
                 )}

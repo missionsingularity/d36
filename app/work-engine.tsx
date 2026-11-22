@@ -13,6 +13,10 @@ import {
   Pause,
   Square,
   RotateCcw,
+  Monitor,
+  Users,
+  Search,
+  ListTodo,
 } from "lucide-react";
 import type { Employee, Snapshot, RecordItem } from "@/lib/enterprise/types";
 import MessageBody from "./message-body";
@@ -221,29 +225,22 @@ export default function WorkEngine({
           <ArrowUpRight size={17} />
         </button>
       ))}
-      {!runs.length && (
-        <p className="muted">Your next completed outcome starts here.</p>
-      )}
+      {!runs.length && <p className="muted">No runs yet.</p>}
     </div>
   );
   return (
     <div className="standard-page engine-page">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">SINGULARITY WORK ENGINE</span>
           <h1>
-            {detail
-              ? "Run workspace"
-              : agent
-                ? agent.config.name
-                : "Good work, together."}
+            {detail ? "Run workspace" : agent ? agent.config.name : "Work"}
           </h1>
           <p className="muted">
             {detail
               ? detail.instruction
               : agent
                 ? agent.config.description
-                : "Turn organizational knowledge into outcomes you can trace."}
+                : "Run agents and review work in progress."}
           </p>
         </div>
         <button onClick={() => navigate("Agent Library")}>
@@ -338,11 +335,11 @@ export default function WorkEngine({
               </nav>
               {pane === "Conversation" ? (
                 <div className="engine-card">
-                  <h2>Requested outcome</h2>
+                  <h2>Request</h2>
                   <p>{detail.instruction}</p>
                   <p>
                     {detail.status === "COMPLETED"
-                      ? "The selected steps are complete. Review artifacts and receipts for the actual outcome."
+                      ? "Steps completed. Review the saved documents and action receipts."
                       : "This run retains its instruction, outputs and approvals across refreshes."}
                   </p>
                   <textarea
@@ -517,7 +514,7 @@ export default function WorkEngine({
             <h2>{agent.config.name}</h2>
             <p>{agent.config.instructions}</p>
             <label>
-              What would you like to accomplish?
+              Task instructions
               <textarea
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
@@ -906,7 +903,7 @@ export default function WorkEngine({
           <h2>
             {tab === "Templates"
               ? "Reusable published workflows"
-              : "Find the right agent for your work"}
+              : "Published agents"}
           </h2>
           <div className="engine-grid">
             {data.agents.map((a) => (
@@ -916,13 +913,14 @@ export default function WorkEngine({
                 onClick={() => openAgent(a)}
               >
                 <span className="engine-symbol">
-                  <Layers3 />
+                  <AgentIcon id={a.id} />
                 </span>
-                <h3>{a.config.name}</h3>
+                <h3 className="engine-agent-name">{a.config.name}</h3>
                 <p>{a.config.description}</p>
                 <small>
                   v{a.version} · {a.config.published ? "Published" : "Draft"} ·{" "}
-                  {a.config.steps.length} steps
+                  {a.config.steps.length}{" "}
+                  {a.config.steps.length === 1 ? "step" : "steps"}
                 </small>
                 <span className="engine-agent-cta">
                   Review & launch <ArrowUpRight size={16} />
@@ -935,22 +933,6 @@ export default function WorkEngine({
         <>
           {tab === "Overview" && (
             <>
-              <div className="engine-overview-banner">
-                <div>
-                  <span className="eyebrow">YOUR WORK, IN MOTION</span>
-                  <h2>What would you like to get done?</h2>
-                  <p>
-                    Choose an agent, review its capabilities, and launch a
-                    traceable run.
-                  </p>
-                </div>
-                <button
-                  className="primary"
-                  onClick={() => navigate("Agent Library")}
-                >
-                  <Play size={16} /> Explore agents
-                </button>
-              </div>
               <div className="engine-card engine-intent">
                 <label>
                   Ask BrahmaGPT to carry out work
@@ -1025,7 +1007,7 @@ export default function WorkEngine({
                     key={a.id}
                     onClick={() => openAgent(a)}
                   >
-                    <Layers3 />
+                    <AgentIcon id={a.id} />
                     <h3>{a.config.name}</h3>
                     <p>{a.config.description}</p>
                     <small>Review capabilities & launch →</small>
@@ -1096,7 +1078,7 @@ export default function WorkEngine({
           <div className="hub-section-heading">
             <h2>
               {tab === "History"
-                ? "Completed outcomes"
+                ? "Completed work"
                 : tab === "My Work"
                   ? "Your assigned runs"
                   : "Recent work"}
@@ -1226,4 +1208,20 @@ function Artifact({ value }: { value: unknown }) {
       {typeof v.status === "string" ? " · " + v.status : ""}
     </p>
   );
+}
+
+function AgentIcon({ id }: { id: string }) {
+  const Icon =
+    id === "it"
+      ? Monitor
+      : id === "hr"
+        ? Users
+        : id === "document"
+          ? FileText
+          : id === "research"
+            ? Search
+            : id === "operations"
+              ? ListTodo
+              : Layers3;
+  return <Icon size={23} strokeWidth={1.7} />;
 }

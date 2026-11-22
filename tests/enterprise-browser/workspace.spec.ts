@@ -32,7 +32,7 @@ test("primary workflow, exact approval, exports, search, persistence and visual 
   ).toBeVisible();
   await page.screenshot({ path: screen + "/home.png", fullPage: true });
   await page
-    .getByRole("textbox", { name: "Ask, search, or create anything" })
+    .getByRole("textbox", { name: "Ask a question or describe a task" })
     .fill(
       "Find unresolved laptop issues affecting Project Alpha, check the replacement policy, prepare requests and send to the IT Manager for approval.",
     );
@@ -257,9 +257,7 @@ test("unified Home search, featured agents and keyboard source previews work", a
     nav.getByRole("button", { name: "Search", exact: true }),
   ).toHaveCount(0);
   await expect(page.locator(".agent-card")).toHaveCount(4);
-  await expect(
-    page.getByRole("heading", { name: "My relevant tasks" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "My tasks" })).toBeVisible();
   const input = page.getByRole("searchbox", {
     name: "Search across Singularity",
   });
@@ -331,7 +329,7 @@ test("unified Home search, featured agents and keyboard source previews work", a
     .getByRole("button", { name: "New chat", exact: true })
     .click();
   await expect(
-    page.getByRole("textbox", { name: "Ask, search, or create anything" }),
+    page.getByRole("textbox", { name: "Ask a question or describe a task" }),
   ).toHaveValue("");
   await page.goto("/");
   await input.fill("Alpha");

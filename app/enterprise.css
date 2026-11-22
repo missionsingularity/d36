@@ -6,9 +6,9 @@
   --text: #17191d;
   --muted: #747987;
   --border: #e7e9ee;
-  --accent: #6554c0;
-  --accent-soft: #f0edfb;
-  --hover: #f0f1f5;
+  --accent: #315b87;
+  --accent-soft: #e7edf2;
+  --hover: #e7edf2;
   color-scheme: light;
 }
 [data-theme="dark"] {
@@ -18,8 +18,8 @@
   --text: #f5f6f8;
   --muted: #a1a5af;
   --border: #30343b;
-  --accent: #aa9aee;
-  --accent-soft: #2a2440;
+  --accent: #b7c5d3;
+  --accent-soft: #1d2935;
   --hover: #252830;
   color-scheme: dark;
 }
@@ -171,7 +171,7 @@ legend {
   color: #fff;
 }
 .primary:hover {
-  background: #5743b1;
+  background: #315b87;
 }
 .text-button {
   border: 0;
@@ -183,12 +183,6 @@ legend {
 .text-button:hover {
   color: var(--accent);
   background: transparent;
-}
-.eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 1.65px;
-  color: var(--muted);
 }
 .spaced {
   margin-top: 36px;
@@ -589,10 +583,6 @@ legend {
   display: block;
   margin-bottom: 17px;
 }
-.home-intro .eyebrow {
-  font-size: 9px;
-  letter-spacing: 2px;
-}
 .home-intro h1 {
   font-size: 34px;
   font-weight: 500;
@@ -604,9 +594,9 @@ legend {
   color: var(--muted);
 }
 .composer {
-  border: 1px solid #dcdde5;
+  border: 1px solid #e7edf2;
   border-radius: 13px;
-  box-shadow: 0 3px 14px #24223608;
+  box-shadow: 0 3px 14px #1d293508;
   background: var(--bg);
   padding: 16px 16px 12px;
 }
@@ -833,7 +823,7 @@ legend {
   border: 1px solid var(--border);
   border-radius: 7px;
   background: var(--secondary);
-  color: #7e76a9;
+  color: #6e8297;
   flex-shrink: 0;
 }
 .type-IT {
@@ -899,7 +889,7 @@ legend {
 .search-field {
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 8px 30px #191c2908;
+  box-shadow: 0 8px 30px #1d293508;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -978,7 +968,7 @@ legend {
 }
 .empty-state > svg {
   margin: 0 auto 15px;
-  color: #a9a3c0;
+  color: #6e8297;
 }
 .empty-state h3 {
   color: var(--text);
@@ -1645,9 +1635,6 @@ code {
   padding: 30px 19px;
   border-right: 1px solid var(--border);
 }
-.document-context > .eyebrow {
-  font-size: 8px;
-}
 .document-context h3 {
   font-size: 15px;
   margin: 18px 0 10px;
@@ -1909,7 +1896,7 @@ code {
 .preview-overlay {
   position: fixed;
   inset: 0;
-  background: #0f10202a;
+  background: #1d29352a;
   border: 0;
   border-radius: 0;
   z-index: 60;
@@ -1918,7 +1905,7 @@ code {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: #10111c55;
+  background: #1d293555;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2103,7 +2090,7 @@ code {
   .drawer-overlay {
     position: fixed;
     inset: 0;
-    background: #11152655;
+    background: #1d293555;
     z-index: 25;
     border: 0;
     border-radius: 0;
@@ -2150,9 +2137,6 @@ code {
   .home-intro h1 {
     font-size: 29px;
     margin-top: 14px;
-  }
-  .home-intro .eyebrow {
-    font-size: 8px;
   }
   .intro-subtitle {
     font-size: 14px;
@@ -2231,9 +2215,6 @@ code {
   }
   h1 {
     font-size: 27px;
-  }
-  .eyebrow {
-    font-size: 9px;
   }
   .standard-page > .section-heading .muted {
     font-size: 12px;
@@ -2495,7 +2476,6 @@ body {
 .document-toolbar > div {
   gap: 10px;
 }
-.document-context > .eyebrow,
 .paper-meta {
   font-size: 10px;
 }

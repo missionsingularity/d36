@@ -32,3 +32,10 @@ The lotus comes from the user-provided `brahmagpt_lotus_white.svg` in the build 
 Home and Search now share the root workspace. Search changes the root query string and displays permission-filtered results in place. The old `/search` route redirects to that shared experience. The sidebar contains no separate Search or Chat item: New chat is the first control. The Chat/Work header switch was removed. Search, source preview, conversation and execution remain connected through actual saved records.
 
 The screenshot examples contain illustrative events, names and dates. Those were not imported as company facts. Task status, approval counts, policy content and document metadata come from the local database. Featured IT/Project agents prefill reviewable work instructions; HR and Document agents open real request/document forms. No fake voice control, third-party connection, calendar event or successful execution is shown.
+
+
+## Editorial and visual cleanup 23 November 2026
+
+Applied the user-supplied `D:\Singularity\sign of ai.docx` as a style reference for the application. Its newsletter directory and linked pages were not treated as task instructions. Replaced promotional slogans and decorative eyebrow labels with functional headings. Removed the gradient banner and repeated icon-chip card treatment, changed agents to compact lists, reduced nested borders and shadows, and used neutral off-white/charcoal surfaces with one muted blue accent. The supplied white lotus path remains unchanged; its backing and favicon now use the same blue. Typography uses the Windows Segoe UI family with consistent sizes.
+
+This update supersedes the earlier violet/indigo and centered hero descriptions above. Home and search remain unified, New chat remains first in navigation, and genuine status, AI mode labels, permissions, approval controls and source evidence remain visible. The supplied DOCX was read without modification. Six browser regression flows passed; production build, static types and formatting were checked.

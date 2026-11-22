@@ -21,7 +21,6 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
-  Sparkles,
   Paperclip,
   ArrowUp,
   ChevronDown,
@@ -66,7 +65,7 @@ import type {
 const nav = [
   { id: "chat", label: "New chat", icon: MessageSquare },
   { id: "", label: "Home", icon: Home },
-  { id: "work", label: "Work / Agents", icon: Sparkles },
+  { id: "work", label: "Work / Agents", icon: Briefcase },
   { id: "projects", label: "Projects", icon: Folder },
   { id: "documents", label: "Documents", icon: FileText },
 ];
@@ -616,8 +615,8 @@ export default function EnterpriseWorkspace() {
           </span>
         </div>
         <textarea
-          aria-label="Ask, search, or create anything"
-          placeholder="Ask, search, or create anything..."
+          aria-label="Ask a question or describe a task"
+          placeholder="Ask a question or describe a task..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -732,7 +731,6 @@ export default function EnterpriseWorkspace() {
       <div className="workflow-view">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">WORKSPACE ACTIVITY</span>
             <h2>{w.objective}</h2>
           </div>
           <Status>{w.status}</Status>
@@ -813,7 +811,6 @@ export default function EnterpriseWorkspace() {
               status: task.status === "Done" ? "Open" : "Done",
             });
           }}
-          heroMark={<Mark />}
           busy={busy}
           compact={section === "chat"}
         />
@@ -822,7 +819,6 @@ export default function EnterpriseWorkspace() {
       return (
         <div className="chat-page">
           <div className="chat-messages">
-            <span className="eyebrow">{chat.title}</span>
             {chat.messages.map((m) => (
               <article key={m.id} className={"message " + m.role}>
                 <div className="message-avatar">
@@ -993,7 +989,6 @@ export default function EnterpriseWorkspace() {
     if (section === "search" || (section === "" && searchActive))
       return (
         <div className="search-page">
-          <span className="eyebrow">ONE SEARCH. YOUR WHOLE WORKSPACE.</span>
           <h1>
             {query ? (
               <>
@@ -1013,7 +1008,7 @@ export default function EnterpriseWorkspace() {
               disabled={busy || !query.trim()}
               onClick={() => send(query)}
             >
-              <Sparkles size={15} />
+              <MessageSquare size={15} />
               Ask BrahmaGPT
             </button>
           </div>
@@ -1119,8 +1114,7 @@ export default function EnterpriseWorkspace() {
       return (
         <div className="document-workspace">
           <aside className="document-context">
-            <span className="eyebrow">DOCUMENT WORKSPACE</span>
-            <h3>Make it your own</h3>
+            <h3>Edit document</h3>
             <p className="muted">
               Edit the draft, explain your revision, then save a new version.
             </p>
@@ -1338,7 +1332,6 @@ export default function EnterpriseWorkspace() {
         <div className="standard-page">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">COLLECTIVE KNOWLEDGE</span>
               <h1>Documents</h1>
               <p className="muted">
                 Ideas, evidence, and decisions. All in one place.
@@ -1377,7 +1370,7 @@ export default function EnterpriseWorkspace() {
               </button>
             ))
           ) : (
-            <Empty title="A place for your next idea">
+            <Empty title="No documents yet">
               Create a document, use a template, or ask BrahmaGPT to prepare a
               report.
             </Empty>
@@ -1405,7 +1398,6 @@ export default function EnterpriseWorkspace() {
     if (section === "approvals")
       return (
         <div className="standard-page">
-          <span className="eyebrow">HUMAN JUDGMENT, BUILT IN</span>
           <h1>Review & approvals</h1>
           <p className="muted">
             Every decision is tied to an exact, immutable document version.
@@ -1629,11 +1621,8 @@ export default function EnterpriseWorkspace() {
         <div className="standard-page">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">BETTER, TOGETHER</span>
               <h1>Projects</h1>
-              <p className="muted">
-                The people, knowledge, and tasks behind your next milestone.
-              </p>
+              <p className="muted">View project tasks and team assignments.</p>
             </div>
             <button className="primary" onClick={projectForm}>
               <Plus size={16} />
@@ -1691,7 +1680,6 @@ export default function EnterpriseWorkspace() {
         <div className="standard-page">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">KEEP YOUR TEAM MOVING</span>
               <h1>IT Operations</h1>
               <p className="muted">
                 Equipment, incidents, and governed replacement requests.
@@ -1706,7 +1694,7 @@ export default function EnterpriseWorkspace() {
                 )
               }
             >
-              <Sparkles size={16} />
+              <MessageSquare size={16} />
               Review replacements
             </button>
           </div>
@@ -1775,9 +1763,8 @@ export default function EnterpriseWorkspace() {
         <div className="standard-page">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">PEOPLE FIRST</span>
               <h1>People & HR</h1>
-              <p className="muted">Find your people. Take time to recharge.</p>
+              <p className="muted">View employee records and request leave.</p>
             </div>
             <button className="primary" onClick={leaveForm}>
               <Calendar size={16} />
@@ -1818,7 +1805,6 @@ export default function EnterpriseWorkspace() {
     if (section === "customize")
       return (
         <div className="standard-page">
-          <span className="eyebrow">A WORKSPACE THAT WORKS YOUR WAY</span>
           <h1>Customize</h1>
           <p className="muted">
             Start from a template, bring your records, or configure your
@@ -2096,7 +2082,6 @@ export default function EnterpriseWorkspace() {
     if (section === "settings")
       return (
         <div className="standard-page settings-page">
-          <span className="eyebrow">YOUR SINGULARITY WORKSPACE</span>
           <h1>Settings</h1>
           <section>
             <h3>Profile & local demo identity</h3>
@@ -2324,9 +2309,7 @@ export default function EnterpriseWorkspace() {
             </button>
           ))}
           {!data?.chats.length && (
-            <p className="empty-recents">
-              A little space for your next big idea.
-            </p>
+            <p className="empty-recents">No recent conversations.</p>
           )}
           {!!data?.chats.length && (
             <button
@@ -2532,7 +2515,6 @@ export default function EnterpriseWorkspace() {
           />
           <aside className="source-preview">
             <div className="section-heading">
-              <span className="eyebrow">SOURCE PREVIEW</span>
               <button
                 aria-label="Close source preview"
                 onClick={() => setPreview(undefined)}
