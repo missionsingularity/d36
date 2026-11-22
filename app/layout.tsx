@@ -6,6 +6,7 @@ import { ThemeProvider } from "./theme-provider";
 export const metadata: Metadata = {
   title: "BrahmaGPT · Singularity",
   description: "Your knowledge, people and work. Connected in one workspace.",
+  icons: { icon: "/brand/favicon.svg" },
 };
 export default function RootLayout({
   children,

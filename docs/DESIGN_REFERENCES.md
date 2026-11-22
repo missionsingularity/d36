@@ -25,7 +25,9 @@ Singularity retains its own original branding, violet accents and local workflow
 
 ## Supplied enterprise Assistant references
 
-The user supplied `BrahmaGPT Enterprise AI Dashboard-2.png` and `BrahmaGPT Enterprise Assistant Dashboard-1.png`. The second image supplies the wider unified Assistant composition; the first supplies source-rich enterprise density and sidebar proportions. The current design uses an original code-rendered BrahmaGPT flower mark, by-Singularity wordmark, organization-wide top search, centered greeting/composer, compact suggestions, a saved-policy spotlight, four real work-agent entry points, personal tasks and organization knowledge.
+The user supplied `BrahmaGPT Enterprise AI Dashboard-2.png` and `BrahmaGPT Enterprise Assistant Dashboard-1.png`. The second image supplies the wider unified Assistant composition; the first supplies source-rich enterprise density and sidebar proportions. The current design uses the supplied white BrahmaGPT lotus on an indigo backing, by-Singularity wordmark, organization-wide top search, centered greeting/composer, compact suggestions, a saved-policy spotlight, four real work-agent entry points, personal tasks and organization knowledge.
+
+The lotus comes from the user-provided `brahmagpt_lotus_white.svg` in the build kit. Its path and white fill are preserved, with only empty outer canvas cropped for legibility. The same asset appears in navigation, the Assistant emblem and chat avatars; the favicon uses the same path on an indigo background. No raster recreation or AI-generated substitute is used.
 
 Home and Search now share the root workspace. Search changes the root query string and displays permission-filtered results in place. The old `/search` route redirects to that shared experience. The sidebar contains no separate Search or Chat item: New chat is the first control. The Chat/Work header switch was removed. Search, source preview, conversation and execution remain connected through actual saved records.
 

@@ -85,21 +85,13 @@ const initials = (s: string) =>
 function Mark({ small = false }: { small?: boolean }) {
   return (
     <span className={"brand-mark " + (small ? "small" : "")}>
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        {Array.from({ length: 6 }, (_, i) => (
-          <ellipse
-            key={i}
-            cx="24"
-            cy="11.7"
-            rx="6.5"
-            ry="9"
-            fill="currentColor"
-            opacity={1 - i * 0.085}
-            transform={"rotate(" + i * 60 + " 24 24)"}
-          />
-        ))}
-        <circle cx="24" cy="24" r="3.6" fill="currentColor" />
-      </svg>
+      <img
+        src="/brand/brahmagpt-lotus-white.svg"
+        alt=""
+        aria-hidden="true"
+        width="43"
+        height="43"
+      />
     </span>
   );
 }
