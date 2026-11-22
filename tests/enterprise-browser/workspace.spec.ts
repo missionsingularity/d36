@@ -46,6 +46,10 @@ test("primary workflow, exact approval, exports, search, persistence and visual 
   await page.locator(".citation-chips button").first().click();
   await expect(page.locator(".source-preview")).toBeVisible();
   await page.getByRole("button", { name: "Close source preview" }).click();
+  await page.getByRole("button", { name: /^Sources \(/ }).click();
+  await expect(page.locator(".source-list-panel")).toBeVisible();
+  await expect(page.locator(".source-list-item").first()).toBeVisible();
+  await page.getByRole("button", { name: "Close sources panel" }).click();
   await page.getByRole("button", { name: "Open in Work", exact: true }).click();
   await expect(page.locator(".timeline li")).toHaveCount(5);
   await page.screenshot({ path: screen + "/work.png", fullPage: true });
@@ -93,7 +97,9 @@ test("primary workflow, exact approval, exports, search, persistence and visual 
   await page.reload();
   await expect(page.locator(".receipt")).toContainText("Replacement ordered");
   await page.goto("/search");
-  await expect(page.getByRole("textbox", { name: "" }).first()).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Search workspace" }),
+  ).toBeVisible();
   await page.screenshot({ path: screen + "/search.png", fullPage: true });
   await page.locator("#enterprise-search").fill("Alpha");
   await expect(page.locator(".result-row").first()).toBeVisible();
@@ -234,4 +240,46 @@ test("API denies cross-origin mutation and restricted HR searches", async ({
   const result = await request.get("/api/workspace?q=onboarding&type=HR");
   const json = await result.json();
   expect(json.results).toEqual([]);
+});
+test("home feed, search filters and keyboard source previews work", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("tab", { name: "Recent documents", exact: true })
+    .click();
+  await expect(page.locator(".feed-rows .knowledge-row").first()).toBeVisible();
+  await page.getByRole("tab", { name: /Your tasks/ }).click();
+  await expect(page.locator(".feed-rows")).toContainText(
+    "Publish rollout guide",
+  );
+  await page.goto("/search");
+  const input = page.getByRole("combobox", { name: "Search workspace" });
+  await input.fill("Alpha");
+  await page
+    .getByLabel("Department", { exact: true })
+    .selectOption("Engineering");
+  await page.getByLabel("Owner", { exact: true }).selectOption("maya");
+  await expect
+    .poll(async () => {
+      const rows = await page.locator(".result-meta").allTextContents();
+      return (
+        rows.length > 0 &&
+        rows.every(
+          (row) => row.includes("Maya Rao") && row.includes("Engineering"),
+        )
+      );
+    })
+    .toBe(true);
+  await page
+    .getByRole("button", { name: "Clear filters", exact: true })
+    .click();
+  await input.fill("ThinkPad");
+  await expect(page.locator(".typeahead button")).toHaveCount(1);
+  await expect(page.locator(".typeahead button")).toContainText("SG-LT-1042");
+  await input.press("ArrowDown");
+  await input.press("Enter");
+  await expect(page.locator(".source-preview")).toContainText("ThinkPad");
+  await input.press("Escape");
+  await expect(page.locator(".source-preview")).toHaveCount(0);
 });

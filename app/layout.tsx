@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./enterprise.css";
+import "./product.css";
+import "@fontsource-variable/inter";
 import { ThemeProvider } from "./theme-provider";
 export const metadata: Metadata = {
   title: "BrahmaGPT · Singularity",

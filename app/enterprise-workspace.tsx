@@ -46,8 +46,11 @@ import {
   ArrowRight,
   Calendar,
   AlertCircle,
+  Copy,
 } from "lucide-react";
 import { useTheme } from "./theme-provider";
+import WorkspaceHome from "./workspace-home";
+import MessageBody from "./message-body";
 import type {
   Snapshot,
   RecordItem,
@@ -57,8 +60,8 @@ import type {
 } from "@/lib/enterprise/types";
 
 const nav = [
-  { id: "", label: "Home", icon: Home },
   { id: "chat", label: "New chat", icon: MessageSquare },
+  { id: "", label: "Home", icon: Home },
   { id: "search", label: "Search", icon: Search },
   { id: "work", label: "My work", icon: Briefcase },
   { id: "projects", label: "Projects", icon: Folder },
@@ -124,6 +127,11 @@ export default function EnterpriseWorkspace() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
   const [collapsed, setCollapsed] = useState(false);
+  const [sourceList, setSourceList] = useState<RecordItem[]>();
+  const [searchDepartment, setSearchDepartment] = useState("All departments");
+  const [searchOwner, setSearchOwner] = useState("Anyone");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [suggestionIndex, setSuggestionIndex] = useState(-1);
   const [drawer, setDrawer] = useState(false);
   const { dark, setDark } = useTheme();
   const [prompt, setPrompt] = useState(""),
@@ -159,6 +167,7 @@ export default function EnterpriseWorkspace() {
   const [customTab, setCustomTab] = useState("Templates");
   const fileRef = useRef<HTMLInputElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
   const searchSequence = useRef(0);
   const currentDocument = data?.documents.find((d) => d.id === selectedId);
   const chat = data?.chats.find((c) => c.id === selectedId);
@@ -175,10 +184,16 @@ export default function EnterpriseWorkspace() {
   }
   useEffect(() => {
     refresh().catch((e) => setError(e.message));
+    try {
+      setCollapsed(
+        localStorage.getItem("singularity-sidebar-collapsed") === "true",
+      );
+    } catch {}
   }, []);
   useEffect(() => {
     setDrawer(false);
     setPreview(undefined);
+    setSourceList(undefined);
     setError("");
   }, [pathname]);
   useEffect(() => {
@@ -186,6 +201,39 @@ export default function EnterpriseWorkspace() {
     const timer = setTimeout(() => setToast(""), 5000);
     return () => clearTimeout(timer);
   }, [toast]);
+  useEffect(() => {
+    if (!modal) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const container = modalRef.current;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    container
+      ?.querySelector<HTMLElement>("input, textarea, select, button")
+      ?.focus();
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab" || !container) return;
+      const items = [
+        ...container.querySelectorAll<HTMLElement>(
+          "button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href]",
+        ),
+      ];
+      const first = items[0],
+        last = items.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    container?.addEventListener("keydown", trap);
+    return () => {
+      document.body.style.overflow = overflow;
+      container?.removeEventListener("keydown", trap);
+      previous?.focus();
+    };
+  }, [modal]);
   useEffect(() => {
     if (currentDocument) {
       const v = currentDocument.versions.at(-1)!;
@@ -215,11 +263,21 @@ export default function EnterpriseWorkspace() {
         setModal(undefined);
         setPreview(undefined);
         setDrawer(false);
+        setSourceList(undefined);
+        setSearchFocused(false);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [router]);
+  useEffect(() => {
+    const dismiss = (event: MouseEvent) => {
+      if (!(event.target as HTMLElement).closest(".search-field"))
+        setSearchFocused(false);
+    };
+    document.addEventListener("click", dismiss);
+    return () => document.removeEventListener("click", dismiss);
+  }, []);
   useEffect(() => {
     if (section !== "search") return;
     const sequence = ++searchSequence.current;
@@ -299,6 +357,7 @@ export default function EnterpriseWorkspace() {
     }
   }
   function openRecord(r: RecordItem) {
+    setSourceList(undefined);
     if (r.data.documentId) {
       go("documents/" + r.data.documentId);
       return;
@@ -445,6 +504,15 @@ export default function EnterpriseWorkspace() {
   function composer() {
     return (
       <div className="composer">
+        <div className="composer-context">
+          <span>
+            <ShieldCheck size={13} />
+            Your workspace
+          </span>
+          <span>
+            {workMode ? "Plan and carry out work" : "Ask, find, and create"}
+          </span>
+        </div>
         <textarea
           aria-label="Ask, search, or create anything"
           placeholder="Ask, search, or create anything..."
@@ -463,6 +531,7 @@ export default function EnterpriseWorkspace() {
             <button
               title="Attach a text or CSV document"
               aria-label="Attach"
+              disabled={busy}
               onClick={() => fileRef.current?.click()}
             >
               <Paperclip size={17} />
@@ -478,12 +547,16 @@ export default function EnterpriseWorkspace() {
             </button>
             <button
               className={workMode ? "mode-active" : ""}
+              aria-pressed={workMode}
               onClick={() => setWorkMode(!workMode)}
             >
               <Briefcase size={16} />
               <span>Work mode</span>
             </button>
           </div>
+          <span className="composer-hint">
+            {busy ? "Working on it…" : "Enter to send"}
+          </span>
           <button
             className="send-button"
             disabled={busy || !prompt.trim()}
@@ -532,6 +605,12 @@ export default function EnterpriseWorkspace() {
       </button>
     );
   }
+  const visibleResults = results.filter(
+    (r) =>
+      (searchDepartment === "All departments" ||
+        r.department === searchDepartment) &&
+      (searchOwner === "Anyone" || r.owner === searchOwner),
+  );
   function workflowView(w: Workflow) {
     return (
       <div className="workflow-view">
@@ -603,145 +682,15 @@ export default function EnterpriseWorkspace() {
       );
     if (section === "" || (section === "chat" && !chat))
       return (
-        <div className="home-page">
-          <div className="home-intro">
-            <span className="intro-mark">
-              <Mark />
-            </span>
-            <p className="eyebrow">YOUR WORK, CONNECTED</p>
-            <h1>
-              Good{" "}
-              {Number(
-                new Intl.DateTimeFormat("en-GB", {
-                  hour: "numeric",
-                  hourCycle: "h23",
-                  timeZone: "Asia/Kolkata",
-                }).format(new Date()),
-              ) < 12
-                ? "morning"
-                : Number(
-                      new Intl.DateTimeFormat("en-GB", {
-                        hour: "numeric",
-                        hourCycle: "h23",
-                        timeZone: "Asia/Kolkata",
-                      }).format(new Date()),
-                    ) < 17
-                  ? "afternoon"
-                  : "evening"}
-              , {data.user.name.split(" ")[0]}
-            </h1>
-            <p className="intro-subtitle">What would you like to accomplish?</p>
-          </div>
-          {composer()}
-          <div className="suggestions">
-            {[
-              {
-                icon: Search,
-                label: "Find project documents",
-                prompt: "Find Project Alpha documents",
-              },
-              {
-                icon: FileText,
-                label: "Prepare my weekly report",
-                prompt: "Prepare a Project Alpha progress report",
-              },
-              {
-                icon: ShieldCheck,
-                label: "Review pending approvals",
-                path: "approvals",
-              },
-              {
-                icon: Monitor,
-                label: "Check unresolved incidents",
-                prompt:
-                  "Find unresolved laptop incidents affecting Project Alpha",
-              },
-            ].map((s) => (
-              <button
-                key={s.label}
-                onClick={() => (s.path ? go(s.path) : send(s.prompt))}
-              >
-                <s.icon size={15} />
-                {s.label}
-              </button>
-            ))}
-          </div>
-          <div className="home-sections">
-            <div className="section-heading">
-              <h3>Pick up where you left off</h3>
-              <button className="text-button" onClick={() => go("work")}>
-                View my work <ChevronRight size={15} />
-              </button>
-            </div>
-            <div className="activity-list">
-              {data.records
-                .filter(
-                  (r) =>
-                    r.type === "Tasks" &&
-                    r.owner === data.user.id &&
-                    r.status !== "Done",
-                )
-                .slice(0, 2)
-                .map((r) => (
-                  <button key={r.id} onClick={() => openRecord(r)}>
-                    <span className="activity-icon">
-                      <CheckCircle2 size={18} />
-                    </span>
-                    <span>
-                      <strong>{r.title}</strong>
-                      <small>Project Alpha · Assigned to you</small>
-                    </span>
-                    <Status>{r.status}</Status>
-                  </button>
-                ))}
-              {data.approvals
-                .filter((a) => a.status === "PENDING_APPROVAL")
-                .slice(0, 1)
-                .map((a) => (
-                  <button key={a.id} onClick={() => go("approvals")}>
-                    <span className="activity-icon">
-                      <ShieldCheck size={18} />
-                    </span>
-                    <span>
-                      <strong>
-                        {
-                          data.documents.find((d) => d.id === a.documentId)
-                            ?.title
-                        }
-                      </strong>
-                      <small>Awaiting review</small>
-                    </span>
-                    <ChevronRight size={16} />
-                  </button>
-                ))}
-            </div>
-            <div className="section-heading recent-heading">
-              <h3>From your workspace</h3>
-              <button className="text-button" onClick={() => go("documents")}>
-                All documents <ChevronRight size={15} />
-              </button>
-            </div>
-            {data.records
-              .filter((r) => r.type === "Documents")
-              .slice(0, 3)
-              .map((r) => (
-                <button
-                  className="compact-document"
-                  key={r.id}
-                  onClick={() => openRecord(r)}
-                >
-                  <FileText size={17} />
-                  <span>{r.title}</span>
-                  <small>{r.department}</small>
-                  <ChevronRight size={14} />
-                </button>
-              ))}
-          </div>
-          <p className="home-footnote">
-            <ShieldCheck size={13} />
-            Private by design. Answers use the records you can access.
-          </p>
-        </div>
+        <WorkspaceHome
+          data={data}
+          composer={composer()}
+          go={go}
+          send={(text) => {
+            void send(text);
+          }}
+          openRecord={openRecord}
+        />
       );
     if (section === "chat" && chat)
       return (
@@ -761,7 +710,18 @@ export default function EnterpriseWorkspace() {
                   <strong>
                     {m.role === "user" ? data.user.name : "BrahmaGPT"}
                   </strong>
-                  <p className="message-text">{m.text}</p>
+                  {m.role === "assistant" && (
+                    <span className="answer-mode">
+                      {m.text.startsWith("OFFLINE LOCAL MODE")
+                        ? "Offline local mode"
+                        : "Live Gemini"}
+                    </span>
+                  )}
+                  {m.role === "assistant" ? (
+                    <MessageBody text={m.text} />
+                  ) : (
+                    <p className="message-text">{m.text}</p>
+                  )}
                   {m.runId &&
                     (() => {
                       const w = data.workflows.find((w) => w.id === m.runId);
@@ -797,6 +757,35 @@ export default function EnterpriseWorkspace() {
                               ))}
                             </div>
                             <div className="message-links">
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(
+                                      m.text.replace(
+                                        /^(LIVE GEMINI|OFFLINE LOCAL MODE)\s*\n+/,
+                                        "",
+                                      ),
+                                    );
+                                    setToast("Response copied");
+                                  } catch {
+                                    setError(
+                                      "Could not copy. Select the response text to copy it manually.",
+                                    );
+                                  }
+                                }}
+                              >
+                                <Copy size={14} />
+                                Copy response
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setPreview(undefined);
+                                  setSourceList(w.sources);
+                                }}
+                              >
+                                <BookOpen size={15} />
+                                Sources ({w.sources.length})
+                              </button>
                               {w.status === "Failed" && !w.documentId && (
                                 <button
                                   disabled={busy}
@@ -820,6 +809,39 @@ export default function EnterpriseWorkspace() {
                                 </button>
                               )}
                             </div>
+                            {m.id === chat.messages.at(-1)?.id &&
+                              w.status !== "Failed" && (
+                                <div className="answer-followups">
+                                  <span>Keep exploring</span>
+                                  <button
+                                    onClick={() => {
+                                      setPrompt(
+                                        "Find policies related to " +
+                                          w.objective,
+                                      );
+                                      document
+                                        .querySelector<HTMLTextAreaElement>(
+                                          ".chat-composer textarea",
+                                        )
+                                        ?.focus();
+                                    }}
+                                  >
+                                    Find related policies
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setQuery(
+                                        w.sources.find(
+                                          (r) => r.type === "Projects",
+                                        )?.title || "Alpha",
+                                      );
+                                      go("search");
+                                    }}
+                                  >
+                                    Explore in Search
+                                  </button>
+                                </div>
+                              )}
                           </>
                         )
                       );
@@ -847,7 +869,7 @@ export default function EnterpriseWorkspace() {
       return (
         <div className="search-page">
           <span className="eyebrow">ONE SEARCH. YOUR WHOLE WORKSPACE.</span>
-          <h1>Find what moves work forward.</h1>
+          <h1>Search your workspace</h1>
           <form
             className="search-field"
             onSubmit={(e) => {
@@ -860,9 +882,49 @@ export default function EnterpriseWorkspace() {
             <Search size={22} />
             <input
               id="enterprise-search"
+              aria-label="Search workspace"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={
+                searchFocused && query.length > 1 && visibleResults.length > 0
+              }
+              aria-controls="search-suggestions"
+              aria-activedescendant={
+                suggestionIndex >= 0
+                  ? "search-suggestion-" + suggestionIndex
+                  : undefined
+              }
+              onFocus={() => setSearchFocused(true)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setSuggestionIndex((i) =>
+                    Math.min(i + 1, Math.min(visibleResults.length, 3) - 1),
+                  );
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setSuggestionIndex((i) => Math.max(i - 1, -1));
+                }
+                if (
+                  e.key === "Enter" &&
+                  searchFocused &&
+                  suggestionIndex >= 0 &&
+                  visibleResults[suggestionIndex]
+                ) {
+                  e.preventDefault();
+                  openRecord(visibleResults[suggestionIndex]);
+                  setSearchFocused(false);
+                  setSuggestionIndex(-1);
+                }
+              }}
               placeholder="Search documents, people, projects..."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSuggestionIndex(-1);
+                setSearchFocused(true);
+              }}
               autoFocus
             />
             {query && (
@@ -875,6 +937,40 @@ export default function EnterpriseWorkspace() {
               </button>
             )}
             <kbd>Enter</kbd>
+            {searchFocused && query.length > 1 && visibleResults.length > 0 && (
+              <div
+                className="typeahead"
+                id="search-suggestions"
+                role="listbox"
+                aria-label="Suggested records"
+              >
+                <span className="typeahead-label">Jump to a result</span>
+                {visibleResults.slice(0, 3).map((r, i) => (
+                  <button
+                    role="option"
+                    aria-selected={suggestionIndex === i}
+                    id={"search-suggestion-" + i}
+                    className={suggestionIndex === i ? "highlighted" : ""}
+                    key={r.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      openRecord(r);
+                      setSearchFocused(false);
+                    }}
+                  >
+                    <FileText size={17} />
+                    <span>
+                      <strong>{r.title}</strong>
+                      <small>
+                        {r.type} · {r.department}
+                      </small>
+                    </span>
+                    <span className="typeahead-open">Open</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </form>
           <div className="search-tabs">
             {[
@@ -895,6 +991,54 @@ export default function EnterpriseWorkspace() {
               </button>
             ))}
           </div>
+          <div className="search-filter-bar">
+            <span>
+              <SlidersHorizontal size={14} />
+              Filter by
+            </span>
+            <label className="sr-only" htmlFor="department-filter">
+              Department
+            </label>
+            <select
+              id="department-filter"
+              value={searchDepartment}
+              onChange={(e) => setSearchDepartment(e.target.value)}
+            >
+              <option>All departments</option>
+              {[...new Set(data.records.map((r) => r.department))].map(
+                (department) => (
+                  <option key={department}>{department}</option>
+                ),
+              )}
+            </select>
+            <label className="sr-only" htmlFor="owner-filter">
+              Owner
+            </label>
+            <select
+              id="owner-filter"
+              value={searchOwner}
+              onChange={(e) => setSearchOwner(e.target.value)}
+            >
+              <option value="Anyone">Anyone</option>
+              {data.users.map((u) => (
+                <option value={u.id} key={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+            {(searchDepartment !== "All departments" ||
+              searchOwner !== "Anyone") && (
+              <button
+                className="clear-filters"
+                onClick={() => {
+                  setSearchDepartment("All departments");
+                  setSearchOwner("Anyone");
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
           {!query && data.searchHistory.length > 0 && (
             <div className="search-history">
               <Clock size={14} />
@@ -909,7 +1053,7 @@ export default function EnterpriseWorkspace() {
             <p className="muted">
               {searching
                 ? "Searching your permitted records…"
-                : `${results.length} ${query ? "results" : "workspace records"}`}
+                : `${visibleResults.length} ${query ? "results" : "workspace records"}`}
             </p>
             <span className="filter-label">
               <ShieldCheck size={14} />
@@ -917,8 +1061,8 @@ export default function EnterpriseWorkspace() {
             </span>
           </div>
           <div className="search-results">
-            {results.map(sourceRow)}
-            {!searching && !results.length && (
+            {visibleResults.map(sourceRow)}
+            {!searching && !visibleResults.length && (
               <Empty title="No matching records">
                 Try a project name, document title, or colleague.
               </Empty>
@@ -2054,7 +2198,13 @@ export default function EnterpriseWorkspace() {
     );
   };
   return (
-    <div className={"enterprise-app " + (collapsed ? "sidebar-collapsed" : "")}>
+    <div
+      className={
+        "enterprise-app " +
+        (collapsed ? "sidebar-collapsed " : "") +
+        (preview || sourceList ? "context-open" : "")
+      }
+    >
       {drawer && (
         <button
           className="drawer-overlay"
@@ -2073,7 +2223,16 @@ export default function EnterpriseWorkspace() {
           <button
             className="sidebar-toggle"
             aria-label="Collapse navigation"
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={() => {
+              const next = !collapsed;
+              setCollapsed(next);
+              try {
+                localStorage.setItem(
+                  "singularity-sidebar-collapsed",
+                  String(next),
+                );
+              } catch {}
+            }}
           >
             {collapsed ? (
               <PanelLeftOpen size={17} />
@@ -2095,7 +2254,10 @@ export default function EnterpriseWorkspace() {
             <button
               title={n.label}
               key={n.id}
-              className={section === n.id ? "active" : ""}
+              className={
+                (section === n.id ? "active" : "") +
+                (n.id === "chat" ? " new-chat-nav" : "")
+              }
               onClick={() => {
                 go(n.id);
                 if (n.id === "chat") setPrompt("");
@@ -2191,7 +2353,10 @@ export default function EnterpriseWorkspace() {
             <button
               className="mobile-menu"
               aria-label="Open navigation"
-              onClick={() => setDrawer(true)}
+              onClick={() => {
+                setCollapsed(false);
+                setDrawer(true);
+              }}
             >
               <PanelLeftOpen size={20} />
             </button>
@@ -2209,7 +2374,34 @@ export default function EnterpriseWorkspace() {
               </strong>
             </span>
           </div>
+          {["", "chat", "work"].includes(section) && (
+            <div className="workspace-view-switch" aria-label="Workspace view">
+              <button
+                className={section !== "work" ? "selected" : ""}
+                onClick={() => go("chat" + (chat ? "/" + chat.id : ""))}
+              >
+                <MessageSquare size={15} />
+                Chat
+              </button>
+              <button
+                className={section === "work" ? "selected" : ""}
+                onClick={() => go("work" + (run ? "/" + run.id : ""))}
+              >
+                <Briefcase size={15} />
+                Work
+              </button>
+            </div>
+          )}
           <div className="topbar-actions">
+            <button
+              className="global-search-shortcut"
+              aria-label="Search workspace"
+              onClick={() => go("search")}
+            >
+              <Search size={16} />
+              <span>Search your workspace</span>
+              <kbd>Ctrl K</kbd>
+            </button>
             <span className="connection-label">
               <span
                 className={
@@ -2256,6 +2448,57 @@ export default function EnterpriseWorkspace() {
         )}
         <div className="page-body">{content()}</div>
       </main>
+      {sourceList && (
+        <>
+          <button
+            className="preview-overlay"
+            aria-label="Close sources"
+            onClick={() => setSourceList(undefined)}
+          />
+          <aside className="source-preview source-list-panel">
+            <div className="section-heading">
+              <h3>
+                Sources <span>{sourceList.length}</span>
+              </h3>
+              <button
+                aria-label="Close sources panel"
+                onClick={() => setSourceList(undefined)}
+              >
+                <X size={19} />
+              </button>
+            </div>
+            <p className="source-list-intro">
+              The workspace records used in this response. Open a source to
+              verify the details.
+            </p>
+            {sourceList.map((r, i) => (
+              <button
+                className="source-list-item"
+                key={r.id}
+                onClick={() => openRecord(r)}
+              >
+                <span className="source-reference">{i + 1}</span>
+                <span>
+                  <strong>{r.title}</strong>
+                  <small>
+                    {r.type} · {r.department}
+                  </small>
+                  <p>{r.body.slice(0, 150)}</p>
+                </span>
+              </button>
+            ))}
+            {sourceList.length === 0 && (
+              <p className="muted">
+                This request did not retrieve any sources.
+              </p>
+            )}
+            <div className="sources-permission">
+              <ShieldCheck size={15} />
+              Only records you can access
+            </div>
+          </aside>
+        </>
+      )}
       {preview && (
         <>
           <button
@@ -2339,6 +2582,7 @@ export default function EnterpriseWorkspace() {
           }}
         >
           <div
+            ref={modalRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-title"
