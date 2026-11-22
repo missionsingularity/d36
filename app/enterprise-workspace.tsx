@@ -167,6 +167,7 @@ export default function EnterpriseWorkspace() {
   const [customTab, setCustomTab] = useState("Templates");
   const fileRef = useRef<HTMLInputElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const renderedChat = useRef<string | undefined>(undefined);
   const modalRef = useRef<HTMLDivElement>(null);
   const searchSequence = useRef(0);
   const currentDocument = data?.documents.find((d) => d.id === selectedId);
@@ -247,8 +248,13 @@ export default function EnterpriseWorkspace() {
     if (data) setSettingsText(JSON.stringify(data.settings, null, 2));
   }, [data?.settings]);
   useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chat?.messages.length]);
+    if (!chat) return;
+    bottom.current?.scrollIntoView({
+      behavior: renderedChat.current === chat.id ? "smooth" : "auto",
+      block: "end",
+    });
+    renderedChat.current = chat.id;
+  }, [chat?.id, chat?.messages.length]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {

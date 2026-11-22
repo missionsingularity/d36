@@ -60,7 +60,8 @@ Install Chromium with `npx.cmd playwright install chromium` if absent. Browser t
 - `.env.local`: local server credentials; never committed.
 - `.data/enterprise.sqlite`: live enterprise database; never committed. Existing prior databases are untouched.
 - `lib/enterprise/`: retrieval, deterministic calculations, tool planner, governed execution and CSV import.
-- `app/enterprise-workspace.tsx` and `app/enterprise.css`: one active interface and design system.
+- `app/enterprise-workspace.tsx`, `app/workspace-home.tsx`, `app/message-body.tsx`: shared shell, personalized home feed and readable chat responses.
+- `app/enterprise.css` and `app/product.css`: base components and refined product styling; Inter Variable fonts are hosted locally.
 - `tests/legacy-support/`: historical synthetic fixtures and services for regression tests only.
 - `checkpoint/pre-enterprise-rebuild-20261122`: original code checkpoint in Git. Ignored `recovery-before-rebuild.bundle` is a verified full-history local backup.
 

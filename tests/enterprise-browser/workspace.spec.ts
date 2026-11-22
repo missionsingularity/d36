@@ -49,6 +49,11 @@ test("primary workflow, exact approval, exports, search, persistence and visual 
   await page.getByRole("button", { name: /^Sources \(/ }).click();
   await expect(page.locator(".source-list-panel")).toBeVisible();
   await expect(page.locator(".source-list-item").first()).toBeVisible();
+  expect(
+    await page
+      .locator(".main-shell")
+      .evaluate((el) => el.getBoundingClientRect().right),
+  ).toBeLessThanOrEqual(1061);
   await page.getByRole("button", { name: "Close sources panel" }).click();
   await page.getByRole("button", { name: "Open in Work", exact: true }).click();
   await expect(page.locator(".timeline li")).toHaveCount(5);

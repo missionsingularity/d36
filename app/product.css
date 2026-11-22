@@ -49,7 +49,7 @@ select {
 }
 .main-shell {
   margin-left: 240px;
-  transition: margin-right 0.2s ease;
+  transition: none;
 }
 .sidebar-brand {
   padding: 0 10px;

@@ -3,7 +3,7 @@ recovery-before-rebuild.bundle
 .npm-cache/
 .qa/
 .next/
-.next-dev/
+.next-dev*/
 .runtime/
 .next-test/
 .next-build*/
