@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1",
+    "dev": "node scripts/dev.mjs",
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --project tsconfig.check.json --noEmit",
@@ -12,7 +12,7 @@
     "seed": "tsx scripts/enterprise-seed.ts",
     "test:legacy": "tsx --test tests/engine.test.ts tests/grievances.test.ts tests/guided-demo.test.ts tests/workflow-templates.test.ts tests/demo-world.test.ts tests/sqlite-store.test.ts tests/realistic-scenarios.test.ts tests/legacy-systems.test.ts tests/run-policy.test.ts tests/work-completion.test.ts",
     "setup": "node scripts/setup.mjs",
-    "lint": "prettier --check app lib/enterprise tests/enterprise.test.ts tests/gemini.test.ts tests/enterprise-browser playwright.enterprise.config.ts postcss.config.mjs scripts/setup.mjs scripts/enterprise-seed.ts"
+    "lint": "prettier --check app lib/enterprise tests/enterprise.test.ts tests/gemini.test.ts tests/enterprise-browser playwright.enterprise.config.ts postcss.config.mjs scripts/setup.mjs scripts/enterprise-seed.ts scripts/dev.mjs next.config.ts"
   },
   "dependencies": {
     "@google/genai": "^3.6.1",

@@ -1,6 +1,25 @@
 import { test, expect } from "@playwright/test";
 import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 const screen = ".qa";
+test("duplicate development compiler is refused without breaking the active server", async ({
+  request,
+}) => {
+  const result = spawnSync(
+    process.execPath,
+    ["scripts/dev.mjs", "--port", "3101"],
+    {
+      cwd: process.cwd(),
+      env: { ...process.env, NEXT_DIST_DIR: ".next-test" },
+      encoding: "utf8",
+      timeout: 10000,
+      windowsHide: true,
+    },
+  );
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain("already running");
+  expect((await request.get("/api/workspace")).status()).toBe(200);
+});
 fs.mkdirSync(screen, { recursive: true });
 test("primary workflow, exact approval, exports, search, persistence and visual pages", async ({
   page,

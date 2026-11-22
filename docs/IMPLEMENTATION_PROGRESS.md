@@ -50,3 +50,11 @@ Development output now uses `.next-dev`, production uses `.next`, and browser te
 Validation: 19 enterprise/Gemini regression tests passed, all three browser scenarios passed, formatting and type checks passed, and the production build passed while development was running. Live Gemini planning/local search had previously succeeded; upstream outages are not represented as successful execution.
 
 Final live verification: Google continued returning 503 for the selected 3.8 Flash model even after bounded retries. Listed project-accessible models, verified structured output with 3.5 Flash Lite and selected it through the private local GEMINI_MODEL override. Replaced the leftover development process with the tested production server. A complete live request returned HTTP 200, validated a registered-tool plan, completed SQLite search and returned seven permitted sources. Existing failed workflow history was preserved.
+
+## Follow-up: repeated development bundle HTTP 500
+
+Reproduced `Cannot read properties of undefined (reading 'call')` from `.next-dev/server/webpack-runtime.js` on both Home and the API. The active process was a development server with corrupted generated chunks. Stopped only the verified workspace Next.js processes and restored the existing production server on port 3000.
+
+Added a guarded `scripts/dev.mjs` launcher: exclusive per-output lock, explicit occupied-port refusal, validated cleanup of development/test output before compilation, and Windows child-process-tree shutdown. It never clears production `.next`, environment files or persistent data. Disabled Webpack's filesystem cache in development to avoid reusing stale generated modules. Production caching is unchanged.
+
+Verification: all four browser scenarios passed, including a new regression that a second compiler targeting the active test output is refused while the existing API remains healthy. Type checking, formatting and an isolated production build passed. The actual running Home, Chat and Search pages returned HTTP 200 in Chromium with zero page errors. The running API also returned HTTP 200. Development changes are documented in README.

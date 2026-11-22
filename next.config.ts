@@ -6,5 +6,10 @@ export default function config(phase: string): NextConfig {
     distDir:
       process.env.NEXT_DIST_DIR ||
       (phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next"),
+    webpack(config, { dev }) {
+      // Avoid reloading stale filesystem-cache modules after Windows restarts.
+      if (dev) config.cache = false;
+      return config;
+    },
   };
 }

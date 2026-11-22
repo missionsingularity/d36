@@ -4,6 +4,7 @@ recovery-before-rebuild.bundle
 .qa/
 .next/
 .next-dev/
+.runtime/
 .next-test/
 .next-build*/
 .data/

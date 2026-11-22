@@ -16,6 +16,8 @@ npm.cmd run dev
 
 Open http://127.0.0.1:3000. The database seeds automatically on first use, so `seed` is optional. Setup preserves any existing `.env.local` and all data. No Docker or enterprise API account is required.
 
+The development launcher refuses duplicate servers and occupied ports, then clears only its generated development output before starting. Production output and your data are preserved. For ordinary use after a build, run `npm.cmd start`; use `npm.cmd run dev` when editing the code.
+
 ## Add your Gemini API key later
 
 Open `.env.local` in this project's root:
