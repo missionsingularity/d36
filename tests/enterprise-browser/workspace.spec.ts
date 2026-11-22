@@ -103,7 +103,7 @@ test("primary workflow, exact approval, exports, search, persistence and visual 
   await expect(page.locator(".receipt")).toContainText("Replacement ordered");
   await page.goto("/search");
   await expect(
-    page.getByRole("combobox", { name: "Search workspace" }),
+    page.getByRole("searchbox", { name: "Search across Singularity" }),
   ).toBeVisible();
   await page.screenshot({ path: screen + "/search.png", fullPage: true });
   await page.locator("#enterprise-search").fill("Alpha");
@@ -143,7 +143,8 @@ test("primary workflow, exact approval, exports, search, persistence and visual 
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.goto("/");
   await page.screenshot({ path: screen + "/dark.png", fullPage: true });
-  await page.getByRole("button", { name: "Toggle theme" }).click();
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "Light", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Good/ })).toBeVisible();
@@ -246,21 +247,28 @@ test("API denies cross-origin mutation and restricted HR searches", async ({
   const json = await result.json();
   expect(json.results).toEqual([]);
 });
-test("home feed, search filters and keyboard source previews work", async ({
+test("unified Home search, featured agents and keyboard source previews work", async ({
   page,
 }) => {
   await page.goto("/");
-  await page
-    .getByRole("tab", { name: "Recent documents", exact: true })
-    .click();
-  await expect(page.locator(".feed-rows .knowledge-row").first()).toBeVisible();
-  await page.getByRole("tab", { name: /Your tasks/ }).click();
-  await expect(page.locator(".feed-rows")).toContainText(
-    "Publish rollout guide",
-  );
-  await page.goto("/search");
-  const input = page.getByRole("combobox", { name: "Search workspace" });
-  await input.fill("Alpha");
+  const nav = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(nav.getByRole("button").first()).toHaveText("New chat");
+  await expect(
+    nav.getByRole("button", { name: "Search", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".agent-card")).toHaveCount(4);
+  await expect(
+    page.getByRole("heading", { name: "My relevant tasks" }),
+  ).toBeVisible();
+  const input = page.getByRole("searchbox", {
+    name: "Search across Singularity",
+  });
+  await input.pressSequentially("Alpha", { delay: 15 });
+  await expect(input).toHaveValue("Alpha");
+  await expect(page).toHaveURL(/\?q=Alpha/);
+  await expect(page.locator(".result-row").first()).toBeVisible();
+  await page.reload();
+  await expect(input).toHaveValue("Alpha");
   await page
     .getByLabel("Department", { exact: true })
     .selectOption("Engineering");
@@ -280,11 +288,62 @@ test("home feed, search filters and keyboard source previews work", async ({
     .getByRole("button", { name: "Clear filters", exact: true })
     .click();
   await input.fill("ThinkPad");
-  await expect(page.locator(".typeahead button")).toHaveCount(1);
-  await expect(page.locator(".typeahead button")).toContainText("SG-LT-1042");
+  await expect(page.locator(".result-row")).toHaveCount(1);
   await input.press("ArrowDown");
-  await input.press("Enter");
+  await expect(page.locator(".result-row")).toBeFocused();
+  await page.keyboard.press("Enter");
   await expect(page.locator(".source-preview")).toContainText("ThinkPad");
-  await input.press("Escape");
+  await page.keyboard.press("Escape");
   await expect(page.locator(".source-preview")).toHaveCount(0);
+  await page.getByRole("button", { name: "Clear search", exact: true }).click();
+  await expect(page.locator(".agent-card")).toHaveCount(4);
+  await page
+    .getByRole("button", { name: "Open IT Operations Agent", exact: true })
+    .click();
+  await expect(page).toHaveURL(/agent=it/);
+  await expect(
+    page.getByRole("textbox", { name: "Ask, search, or create anything" }),
+  ).toHaveValue(/replacement requests/);
+  await expect(
+    page.getByRole("button", { name: "Work mode", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .getByRole("button", { name: "Home", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Open Project Agent", exact: true })
+    .click();
+  await expect(
+    page.getByRole("textbox", { name: "Ask, search, or create anything" }),
+  ).toHaveValue(/progress report/);
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .getByRole("button", { name: "New chat", exact: true })
+    .click();
+  await expect(
+    page.getByRole("textbox", { name: "Ask, search, or create anything" }),
+  ).toHaveValue("");
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .getByRole("button", { name: "Home", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Open HR Agent", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page
+    .getByRole("button", { name: "Open Document Agent", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await input.fill("Alpha");
+  await page
+    .getByRole("button", { name: "Ask BrahmaGPT", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/chat\//);
+  await expect(page.locator(".message.assistant")).toContainText(
+    "Project Alpha",
+  );
 });

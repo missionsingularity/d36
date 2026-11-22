@@ -6,7 +6,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
   Plus,
@@ -47,10 +47,13 @@ import {
   Calendar,
   AlertCircle,
   Copy,
+  CircleHelp,
 } from "lucide-react";
 import { useTheme } from "./theme-provider";
 import WorkspaceHome from "./workspace-home";
 import MessageBody from "./message-body";
+import WorkspaceSearch from "./workspace-search";
+import WorkAgents, { agentStarters, type WorkAgent } from "./work-agents";
 import type {
   Snapshot,
   RecordItem,
@@ -62,11 +65,9 @@ import type {
 const nav = [
   { id: "chat", label: "New chat", icon: MessageSquare },
   { id: "", label: "Home", icon: Home },
-  { id: "search", label: "Search", icon: Search },
-  { id: "work", label: "My work", icon: Briefcase },
+  { id: "work", label: "Work / Agents", icon: Sparkles },
   { id: "projects", label: "Projects", icon: Folder },
   { id: "documents", label: "Documents", icon: FileText },
-  { id: "customize", label: "Customize", icon: SlidersHorizontal },
 ];
 const date = (s: string) =>
   new Date(s).toLocaleDateString("en-GB", {
@@ -84,9 +85,21 @@ const initials = (s: string) =>
 function Mark({ small = false }: { small?: boolean }) {
   return (
     <span className={"brand-mark " + (small ? "small" : "")}>
-      <span />
-      <span />
-      <span />
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        {Array.from({ length: 6 }, (_, i) => (
+          <ellipse
+            key={i}
+            cx="24"
+            cy="11.7"
+            rx="6.5"
+            ry="9"
+            fill="currentColor"
+            opacity={1 - i * 0.085}
+            transform={"rotate(" + i * 60 + " 24 24)"}
+          />
+        ))}
+        <circle cx="24" cy="24" r="3.6" fill="currentColor" />
+      </svg>
     </span>
   );
 }
@@ -119,24 +132,28 @@ function Empty({ title, children }: { title: string; children?: ReactNode }) {
 export default function EnterpriseWorkspace() {
   const pathname = usePathname(),
     router = useRouter(),
+    searchParams = useSearchParams(),
     parts = pathname.split("/").filter(Boolean),
     section = parts[0] || "",
     selectedId = parts[1];
   const [data, setData] = useState<Snapshot>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [searchActive, setSearchActive] = useState(
+    searchParams.has("q") ||
+      searchParams.get("view") === "search" ||
+      section === "search",
+  );
   const [toast, setToast] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [sourceList, setSourceList] = useState<RecordItem[]>();
   const [searchDepartment, setSearchDepartment] = useState("All departments");
   const [searchOwner, setSearchOwner] = useState("Anyone");
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [suggestionIndex, setSuggestionIndex] = useState(-1);
   const [drawer, setDrawer] = useState(false);
   const { dark, setDark } = useTheme();
   const [prompt, setPrompt] = useState(""),
     [workMode, setWorkMode] = useState(false),
-    [query, setQuery] = useState(""),
+    [query, setQuery] = useState(searchParams.get("q") || ""),
     [searchType, setSearchType] = useState("All"),
     [results, setResults] = useState<RecordItem[]>([]),
     [searching, setSearching] = useState(false),
@@ -191,6 +208,33 @@ export default function EnterpriseWorkspace() {
       );
     } catch {}
   }, []);
+  const queryString = searchParams.toString();
+  useEffect(() => {
+    if (section === "search") {
+      router.replace(
+        "/?" +
+          (searchParams.get("q")
+            ? "q=" + encodeURIComponent(searchParams.get("q")!)
+            : "view=search"),
+      );
+      return;
+    }
+    if (section === "") {
+      const value = searchParams.get("q") || "";
+      setQuery(value);
+      setSearchActive(
+        searchParams.has("q") || searchParams.get("view") === "search",
+      );
+    }
+    if (section === "chat" && !selectedId) {
+      const agent = searchParams.get("agent");
+      const initial =
+        searchParams.get("prompt") ||
+        (agent === "it" || agent === "project" ? agentStarters[agent] : "");
+      setPrompt(initial);
+      setWorkMode(searchParams.get("mode") === "work" || !!agent);
+    }
+  }, [section, selectedId, queryString, router]);
   useEffect(() => {
     setDrawer(false);
     setPreview(undefined);
@@ -259,33 +303,20 @@ export default function EnterpriseWorkspace() {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
-        router.push("/search");
-        setTimeout(
-          () => document.getElementById("enterprise-search")?.focus(),
-          100,
-        );
+        document.getElementById("enterprise-search")?.focus();
       }
       if (e.key === "Escape") {
         setModal(undefined);
         setPreview(undefined);
         setDrawer(false);
         setSourceList(undefined);
-        setSearchFocused(false);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [router]);
   useEffect(() => {
-    const dismiss = (event: MouseEvent) => {
-      if (!(event.target as HTMLElement).closest(".search-field"))
-        setSearchFocused(false);
-    };
-    document.addEventListener("click", dismiss);
-    return () => document.removeEventListener("click", dismiss);
-  }, []);
-  useEffect(() => {
-    if (section !== "search") return;
+    if (!(section === "search" || (section === "" && searchActive))) return;
     const sequence = ++searchSequence.current;
     setSearching(true);
     const controller = new AbortController();
@@ -311,8 +342,66 @@ export default function EnterpriseWorkspace() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [section, query, searchType, data?.records.length]);
+  }, [section, searchActive, query, searchType, data?.records.length]);
+  function openSearch(value = query) {
+    setQuery(value);
+    setSearchActive(true);
+    router.push(
+      "/?" + (value.trim() ? "q=" + encodeURIComponent(value) : "view=search"),
+      { scroll: false },
+    );
+  }
+  function changeSearch(value: string) {
+    setQuery(value);
+    setSearchActive(!!value.trim());
+    if (!value.trim()) {
+      setSearchDepartment("All departments");
+      setSearchOwner("Anyone");
+    }
+    const url = value.trim() ? "/?q=" + encodeURIComponent(value) : "/";
+    if (section === "") window.history.replaceState(null, "", url);
+    else router.push(url, { scroll: false });
+  }
+  function startConversation(value: string, work = false) {
+    setPrompt(value);
+    setWorkMode(work);
+    router.push(
+      "/chat?prompt=" + encodeURIComponent(value) + (work ? "&mode=work" : ""),
+      { scroll: false },
+    );
+  }
+  function selectAgent(agent: WorkAgent) {
+    if (agent === "hr") {
+      leaveForm();
+      return;
+    }
+    if (agent === "document") {
+      newDocument(
+        (
+          data?.settings.templates as
+            { name: string; content: string }[] | undefined
+        )?.[0],
+      );
+      return;
+    }
+    router.push("/chat?agent=" + agent, { scroll: false });
+  }
   function go(path: string) {
+    if (path === "search") {
+      openSearch();
+      return;
+    }
+    if (path === "") {
+      setQuery("");
+      setSearchActive(false);
+      setSearchType("All");
+      setSearchDepartment("All departments");
+      setSearchOwner("Anyone");
+    }
+    if (path === "chat") {
+      setPrompt("");
+      setWorkMode(false);
+    }
     router.push("/" + path);
   }
   async function post(body: Record<string, unknown>) {
@@ -542,12 +631,7 @@ export default function EnterpriseWorkspace() {
             >
               <Paperclip size={17} />
             </button>
-            <button
-              onClick={() => {
-                setQuery(prompt);
-                go("search");
-              }}
-            >
+            <button onClick={() => openSearch(prompt)}>
               <Search size={16} />
               <span>Search</span>
             </button>
@@ -581,7 +665,26 @@ export default function EnterpriseWorkspace() {
   }
   function sourceRow(r: RecordItem) {
     return (
-      <button className="result-row" key={r.id} onClick={() => openRecord(r)}>
+      <button
+        className="result-row"
+        key={r.id}
+        onClick={() => openRecord(r)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            (
+              e.currentTarget.nextElementSibling as HTMLButtonElement | null
+            )?.focus();
+          }
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            const previous = e.currentTarget
+              .previousElementSibling as HTMLButtonElement | null;
+            if (previous) previous.focus();
+            else document.getElementById("enterprise-search")?.focus();
+          }
+        }}
+      >
         <span className={"source-icon type-" + r.type}>
           {r.type === "People" ? (
             <Users size={18} />
@@ -686,16 +789,26 @@ export default function EnterpriseWorkspace() {
           Opening your workspace…
         </div>
       );
-    if (section === "" || (section === "chat" && !chat))
+    if ((section === "" && !searchActive) || (section === "chat" && !chat))
       return (
         <WorkspaceHome
           data={data}
           composer={composer()}
           go={go}
-          send={(text) => {
-            void send(text);
-          }}
+          startConversation={startConversation}
           openRecord={openRecord}
+          onSearch={openSearch}
+          onAgent={selectAgent}
+          onTaskToggle={(task) => {
+            void act({
+              action: "task",
+              id: task.id,
+              status: task.status === "Done" ? "Open" : "Done",
+            });
+          }}
+          heroMark={<Mark />}
+          busy={busy}
+          compact={section === "chat"}
         />
       );
     if (section === "chat" && chat)
@@ -836,12 +949,11 @@ export default function EnterpriseWorkspace() {
                                   </button>
                                   <button
                                     onClick={() => {
-                                      setQuery(
+                                      openSearch(
                                         w.sources.find(
                                           (r) => r.type === "Projects",
                                         )?.title || "Alpha",
                                       );
-                                      go("search");
                                     }}
                                   >
                                     Explore in Search
@@ -871,113 +983,33 @@ export default function EnterpriseWorkspace() {
           </div>
         </div>
       );
-    if (section === "search")
+    if (section === "search" || (section === "" && searchActive))
       return (
         <div className="search-page">
           <span className="eyebrow">ONE SEARCH. YOUR WHOLE WORKSPACE.</span>
-          <h1>Search your workspace</h1>
-          <form
-            className="search-field"
-            onSubmit={(e) => {
-              e.preventDefault();
-              fetch(
-                "/api/workspace?q=" + encodeURIComponent(query) + "&save=1",
-              ).then(() => refresh());
-            }}
-          >
-            <Search size={22} />
-            <input
-              id="enterprise-search"
-              aria-label="Search workspace"
-              role="combobox"
-              aria-autocomplete="list"
-              aria-expanded={
-                searchFocused && query.length > 1 && visibleResults.length > 0
-              }
-              aria-controls="search-suggestions"
-              aria-activedescendant={
-                suggestionIndex >= 0
-                  ? "search-suggestion-" + suggestionIndex
-                  : undefined
-              }
-              onFocus={() => setSearchFocused(true)}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setSuggestionIndex((i) =>
-                    Math.min(i + 1, Math.min(visibleResults.length, 3) - 1),
-                  );
-                }
-                if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setSuggestionIndex((i) => Math.max(i - 1, -1));
-                }
-                if (
-                  e.key === "Enter" &&
-                  searchFocused &&
-                  suggestionIndex >= 0 &&
-                  visibleResults[suggestionIndex]
-                ) {
-                  e.preventDefault();
-                  openRecord(visibleResults[suggestionIndex]);
-                  setSearchFocused(false);
-                  setSuggestionIndex(-1);
-                }
-              }}
-              placeholder="Search documents, people, projects..."
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setSuggestionIndex(-1);
-                setSearchFocused(true);
-              }}
-              autoFocus
-            />
-            {query && (
-              <button
-                type="button"
-                aria-label="Clear search"
-                onClick={() => setQuery("")}
-              >
-                <X size={18} />
-              </button>
+          <h1>
+            {query ? (
+              <>
+                Results for <span>“{query}”</span>
+              </>
+            ) : (
+              "Search across Singularity"
             )}
-            <kbd>Enter</kbd>
-            {searchFocused && query.length > 1 && visibleResults.length > 0 && (
-              <div
-                className="typeahead"
-                id="search-suggestions"
-                role="listbox"
-                aria-label="Suggested records"
-              >
-                <span className="typeahead-label">Jump to a result</span>
-                {visibleResults.slice(0, 3).map((r, i) => (
-                  <button
-                    role="option"
-                    aria-selected={suggestionIndex === i}
-                    id={"search-suggestion-" + i}
-                    className={suggestionIndex === i ? "highlighted" : ""}
-                    key={r.id}
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      openRecord(r);
-                      setSearchFocused(false);
-                    }}
-                  >
-                    <FileText size={17} />
-                    <span>
-                      <strong>{r.title}</strong>
-                      <small>
-                        {r.type} · {r.department}
-                      </small>
-                    </span>
-                    <span className="typeahead-open">Open</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </form>
+          </h1>
+          <div className="unified-search-actions">
+            <button className="text-button" onClick={() => go("")}>
+              <Home size={15} />
+              Back to Assistant
+            </button>
+            <button
+              className="primary"
+              disabled={busy || !query.trim()}
+              onClick={() => send(query)}
+            >
+              <Sparkles size={15} />
+              Ask BrahmaGPT
+            </button>
+          </div>
           <div className="search-tabs">
             {[
               "All",
@@ -1049,7 +1081,7 @@ export default function EnterpriseWorkspace() {
             <div className="search-history">
               <Clock size={14} />
               {data.searchHistory.map((q) => (
-                <button key={q} onClick={() => setQuery(q)}>
+                <button key={q} onClick={() => openSearch(q)}>
                   {q}
                 </button>
               ))}
@@ -1357,7 +1389,7 @@ export default function EnterpriseWorkspace() {
           <div className="section-heading">
             <div>
               <span className="eyebrow">FROM INTENT TO OUTCOME</span>
-              <h1>My work</h1>
+              <h1>Work & agents</h1>
               <p className="muted">
                 Real tool operations, saved outputs, and a clear trail.
               </p>
@@ -1367,6 +1399,7 @@ export default function EnterpriseWorkspace() {
               Start work
             </button>
           </div>
+          <WorkAgents onSelect={selectAgent} busy={busy} />
           <button className="approval-banner" onClick={() => go("approvals")}>
             <ShieldCheck size={20} />
             <span>
@@ -2223,7 +2256,7 @@ export default function EnterpriseWorkspace() {
           <button className="brand-link" onClick={() => go("")}>
             <Mark small />
             <span>
-              Singularity<span className="brand-sub">BRAHMAGPT</span>
+              BrahmaGPT<span className="brand-sub">by Singularity</span>
             </span>
           </button>
           <button
@@ -2269,7 +2302,7 @@ export default function EnterpriseWorkspace() {
                 if (n.id === "chat") setPrompt("");
               }}
             >
-              <n.icon size={18} />
+              {n.id === "chat" ? <Plus size={18} /> : <n.icon size={18} />}
               <span>{n.label}</span>
               {n.id === "search" && <kbd>⌘ K</kbd>}
             </button>
@@ -2281,10 +2314,11 @@ export default function EnterpriseWorkspace() {
             { id: "it", label: "IT Operations", icon: Monitor },
             { id: "hr", label: "People & HR", icon: Users },
             { id: "approvals", label: "Approvals", icon: ShieldCheck },
+            { id: "customize", label: "Customize", icon: SlidersHorizontal },
           ]
             .filter(
               (n) =>
-                n.id === "approvals" ||
+                ["approvals", "customize"].includes(n.id) ||
                 !data ||
                 ((data.settings.modules as string[]) || []).includes(
                   n.id.toUpperCase(),
@@ -2331,6 +2365,34 @@ export default function EnterpriseWorkspace() {
               A little space for your next big idea.
             </p>
           )}
+          {!!data?.chats.length && (
+            <button
+              className="all-chats-link"
+              onClick={() =>
+                setModal({
+                  title: "Recent conversations",
+                  content: (
+                    <div className="conversation-picker">
+                      {data.chats.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            setModal(undefined);
+                            go("chat/" + c.id);
+                          }}
+                        >
+                          <MessageSquare size={17} />
+                          {c.title}
+                        </button>
+                      ))}
+                    </div>
+                  ),
+                })
+              }
+            >
+              View all
+            </button>
+          )}
         </div>
         <div className="sidebar-bottom">
           <button
@@ -2347,93 +2409,85 @@ export default function EnterpriseWorkspace() {
             </span>
             <span>
               <strong>{data?.user.name || "Maya Rao"}</strong>
-              <small>{data?.user.department || "Your workspace"}</small>
+              <small>{data?.user.email || "Your workspace"}</small>
             </span>
             <MoreHorizontal size={17} />
           </button>
         </div>
       </aside>
       <main className="main-shell">
-        <header className="topbar">
-          <div className="topbar-left">
-            <button
-              className="mobile-menu"
-              aria-label="Open navigation"
-              onClick={() => {
-                setCollapsed(false);
-                setDrawer(true);
-              }}
-            >
-              <PanelLeftOpen size={20} />
-            </button>
-            <span className="breadcrumb">
-              Workspace
-              <ChevronRight size={13} />
-              <strong>
-                {section
-                  ? section === "it"
-                    ? "IT Operations"
-                    : section === "hr"
-                      ? "People & HR"
-                      : section.charAt(0).toUpperCase() + section.slice(1)
-                  : "Home"}
-              </strong>
-            </span>
-          </div>
-          {["", "chat", "work"].includes(section) && (
-            <div className="workspace-view-switch" aria-label="Workspace view">
-              <button
-                className={section !== "work" ? "selected" : ""}
-                onClick={() => go("chat" + (chat ? "/" + chat.id : ""))}
-              >
-                <MessageSquare size={15} />
-                Chat
-              </button>
-              <button
-                className={section === "work" ? "selected" : ""}
-                onClick={() => go("work" + (run ? "/" + run.id : ""))}
-              >
-                <Briefcase size={15} />
-                Work
-              </button>
-            </div>
-          )}
+        <header className="topbar unified-topbar">
+          <button
+            className="mobile-menu"
+            aria-label="Open navigation"
+            onClick={() => {
+              setCollapsed(false);
+              setDrawer(true);
+            }}
+          >
+            <PanelLeftOpen size={20} />
+          </button>
+          <WorkspaceSearch
+            value={query}
+            onChange={changeSearch}
+            onSubmit={() => {
+              openSearch();
+              if (query.trim())
+                fetch(
+                  "/api/workspace?q=" + encodeURIComponent(query) + "&save=1",
+                )
+                  .then(() => refresh())
+                  .catch((e) => setError(e.message));
+            }}
+            onClear={() => changeSearch("")}
+            active={searchActive}
+          />
           <div className="topbar-actions">
-            <button
-              className="global-search-shortcut"
-              aria-label="Search workspace"
-              onClick={() => go("search")}
-            >
-              <Search size={16} />
-              <span>Search your workspace</span>
-              <kbd>Ctrl K</kbd>
-            </button>
-            <span className="connection-label">
-              <span
-                className={
-                  data?.mode === "LIVE GEMINI" ? "live-dot" : "offline-dot"
-                }
-              />
-              {data?.mode === "LIVE GEMINI"
-                ? "Live Gemini"
-                : "Offline local mode"}
-            </span>
-            <button
-              aria-label="Toggle theme"
-              title="Toggle theme"
-              onClick={() => setDark(!dark)}
-            >
-              {dark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
             <button
               className="notification-button"
               aria-label="Notifications"
               onClick={() => go("notifications")}
             >
-              <Bell size={18} />
+              <Bell size={20} />
               {!!data?.notifications.some((n) => !n.read) && <span />}
             </button>
-            <span className="topbar-separator" />
+            <button
+              aria-label="Workspace help"
+              onClick={() =>
+                setModal({
+                  title: "Your Singularity assistant",
+                  content: (
+                    <div className="workspace-help">
+                      <p>
+                        Search from the top bar to find documents, people,
+                        projects and tasks. Use Ctrl + K to focus search from
+                        anywhere.
+                      </p>
+                      <p>
+                        Start a New chat to ask a question or prepare work.
+                        Featured agents open a focused task you can review
+                        before running.
+                      </p>
+                      <p>
+                        Open citations to inspect sources. Work shows saved
+                        outputs, execution steps and approvals.
+                      </p>
+                      <button
+                        className="primary"
+                        onClick={() => setModal(undefined)}
+                      >
+                        Got it
+                      </button>
+                    </div>
+                  ),
+                })
+              }
+            >
+              <CircleHelp size={20} />
+            </button>
+            <button aria-label="Settings" onClick={() => go("settings")}>
+              <Settings size={20} />
+            </button>
             <button
               className="topbar-avatar avatar"
               aria-label="Profile and settings"
@@ -2443,6 +2497,7 @@ export default function EnterpriseWorkspace() {
             </button>
           </div>
         </header>
+
         {error && (
           <div className="error-banner" role="alert">
             <AlertCircle size={17} />

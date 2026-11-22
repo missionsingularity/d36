@@ -7,24 +7,41 @@ import {
   Monitor,
   CheckCircle2,
   ChevronRight,
-  Folder,
+  CalendarDays,
+  Megaphone,
+  X,
+  BookOpen,
+  ListTodo,
 } from "lucide-react";
 import type { Snapshot, RecordItem } from "@/lib/enterprise/types";
+import WorkAgents, { type WorkAgent } from "./work-agents";
 
 export default function WorkspaceHome({
   data,
   composer,
   go,
-  send,
+  startConversation,
   openRecord,
+  onSearch,
+  onAgent,
+  onTaskToggle,
+  heroMark,
+  busy,
+  compact = false,
 }: {
   data: Snapshot;
   composer: ReactNode;
   go: (path: string) => void;
-  send: (prompt: string) => void;
+  startConversation: (prompt: string, work?: boolean) => void;
   openRecord: (record: RecordItem) => void;
+  onSearch: (value: string) => void;
+  onAgent: (agent: WorkAgent) => void;
+  onTaskToggle: (record: RecordItem) => void;
+  heroMark: ReactNode;
+  busy: boolean;
+  compact?: boolean;
 }) {
-  const [tab, setTab] = useState("For you");
+  const [showPolicy, setShowPolicy] = useState(true);
   const hour = Number(
     new Intl.DateTimeFormat("en-GB", {
       hour: "numeric",
@@ -32,7 +49,6 @@ export default function WorkspaceHome({
       timeZone: "Asia/Kolkata",
     }).format(new Date()),
   );
-  const documents = data.records.filter((r) => r.type === "Documents");
   const projects = new Set(
     data.records
       .filter(
@@ -42,7 +58,7 @@ export default function WorkspaceHome({
       )
       .map((r) => r.id),
   );
-  const relevance = (r: RecordItem) =>
+  const score = (r: RecordItem) =>
     r.owner === data.user.id
       ? 3
       : r.project && projects.has(r.project)
@@ -50,241 +66,233 @@ export default function WorkspaceHome({
         : r.department === "Company"
           ? 1
           : 0;
-  const recommendedDocuments = [...documents].sort(
-    (a, b) => relevance(b) - relevance(a) || b.updated.localeCompare(a.updated),
+  const documents = data.records
+    .filter((r) => r.type === "Documents")
+    .sort((a, b) => score(b) - score(a) || b.updated.localeCompare(a.updated));
+  const tasks = data.records
+    .filter((r) => r.type === "Tasks" && r.owner === data.user.id)
+    .sort((a, b) => Number(a.status === "Done") - Number(b.status === "Done"));
+  const approvals = data.approvals.filter(
+    (a) => a.status === "PENDING_APPROVAL",
   );
-  const tasks = data.records.filter(
-    (r) =>
-      r.type === "Tasks" && r.owner === data.user.id && r.status !== "Done",
-  );
-  const pending = data.approvals.filter((a) => a.status === "PENDING_APPROVAL");
-  const shortDate = (value: string) =>
-    new Date(value).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      timeZone: "Asia/Kolkata",
-    });
+  const policy =
+    data.records.find((r) => r.id === "policy-it") ||
+    documents.find((r) => r.data.policy);
   return (
-    <div className="home-page assistant-home">
-      <div className="home-intro">
-        <p className="home-date">
-          {new Intl.DateTimeFormat("en-GB", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-            timeZone: "Asia/Kolkata",
-          }).format(new Date())}
-        </p>
-        <h1>
+    <div className={"enterprise-home " + (compact ? "new-conversation" : "")}>
+      <section className="assistant-hero" aria-labelledby="assistant-question">
+        <div className="assistant-emblem">{heroMark}</div>
+        <h2 className="assistant-greeting">
           Good {hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening"},{" "}
-          {data.user.name.split(" ")[0]}
-        </h1>
-        <p className="intro-subtitle">What would you like to accomplish?</p>
-      </div>
-      {composer}
-      <div className="suggestions" aria-label="Suggested actions">
+          {data.user.name.split(" ")[0]}.
+        </h2>
+        <p>
+          Here’s what’s happening at{" "}
+          {String(data.settings.workspace || "Singularity")}.
+        </p>
+        <h1 id="assistant-question">What can I help you accomplish?</h1>
+      </section>
+      <div className="hub-composer">{composer}</div>
+      <div className="hub-suggestions" aria-label="Suggested actions">
         {[
           {
-            icon: Search,
             label: "Find project documents",
-            description: "Get the context you need",
-            prompt: "Find Project Alpha documents",
+            icon: Search,
+            action: () => onSearch("Project Alpha"),
           },
           {
-            icon: FileText,
-            label: "Prepare my weekly report",
-            description: "Turn progress into a first draft",
-            prompt: "Prepare a Project Alpha progress report",
-          },
-          {
-            icon: ShieldCheck,
-            label: "Review pending approvals",
-            description: "Keep decisions moving",
-            path: "approvals",
-          },
-          {
-            icon: Monitor,
             label: "Check unresolved incidents",
-            description: "See what needs attention",
-            prompt: "Find unresolved laptop incidents affecting Project Alpha",
+            icon: Monitor,
+            action: () =>
+              startConversation(
+                "Find unresolved IT incidents affecting Project Alpha.",
+              ),
+          },
+          {
+            label: "Prepare approval requests",
+            icon: ShieldCheck,
+            action: () => onAgent("it"),
+          },
+          {
+            label: "Create a project update",
+            icon: FileText,
+            action: () => onAgent("project"),
+          },
+          {
+            label: "Review leave requests",
+            icon: CalendarDays,
+            action: () => go("hr"),
           },
         ].map((s) => (
-          <button
-            key={s.label}
-            onClick={() => (s.path ? go(s.path) : send(s.prompt!))}
-          >
-            <span className="suggestion-icon">
-              <s.icon size={17} />
-            </span>
-            <span>
-              <strong>{s.label}</strong>
-              <small>{s.description}</small>
-            </span>
+          <button key={s.label} disabled={busy} onClick={s.action}>
+            <s.icon size={17} />
+            {s.label}
           </button>
         ))}
       </div>
-      <section className="home-feed" aria-label="Your workspace feed">
-        <div className="feed-navigation">
-          <div className="feed-tabs" role="tablist" aria-label="Workspace feed">
-            {["For you", "Recent documents", "Your tasks"].map((t) => (
+      {!compact && (
+        <>
+          {showPolicy && policy && (
+            <div className="company-spotlight">
+              <Megaphone size={21} />
+              <strong>Policy spotlight</strong>
+              <span>{policy.title}</span>
+              <small>Available in your organization knowledge</small>
+              <button onClick={() => openRecord(policy)}>View policy</button>
               <button
-                role="tab"
-                aria-selected={tab === t}
-                className={tab === t ? "active" : ""}
-                key={t}
-                onClick={() => setTab(t)}
+                className="dismiss-spotlight"
+                aria-label="Dismiss policy spotlight"
+                onClick={() => setShowPolicy(false)}
               >
-                {t}
-                {t === "Your tasks" && tasks.length > 0 && (
-                  <span>{tasks.length}</span>
-                )}
+                <X size={16} />
               </button>
-            ))}
-          </div>
-          <button
-            className="feed-browse"
-            onClick={() => go(tab === "Your tasks" ? "work" : "documents")}
-          >
-            {tab === "Your tasks" ? "View my work" : "Browse documents"}
-            <ChevronRight size={15} />
-          </button>
-        </div>
-        {tab === "For you" && (
-          <div className="for-you-layout">
-            <div>
-              <div className="feed-section-title">
-                <h3>Recommended for you</h3>
-                <span>From your workspace</span>
-              </div>
-              {recommendedDocuments.slice(0, 3).map((r) => (
-                <button
-                  className="knowledge-row"
-                  key={r.id}
-                  onClick={() => openRecord(r)}
-                >
-                  <span className="knowledge-icon">
-                    <FileText size={20} />
-                  </span>
-                  <span className="knowledge-content">
-                    <strong>{r.title}</strong>
-                    <span>
-                      {data.users.find((u) => u.id === r.owner)?.name}{" "}
-                      <span aria-hidden="true">·</span> {r.department}
-                    </span>
-                  </span>
+            </div>
+          )}
+          <WorkAgents
+            onSelect={onAgent}
+            onExplore={() => go("work?view=agents")}
+            busy={busy}
+          />
+          <div className="hub-personal-grid">
+            <section className="personal-work">
+              <div className="hub-section-heading">
+                <h2>
+                  <ListTodo size={20} />
+                  My relevant tasks
+                </h2>
+                <button onClick={() => go("work")}>
+                  View all tasks
                   <ChevronRight size={15} />
                 </button>
-              ))}
-            </div>
-            <aside className="attention-list">
-              <h3>On your radar</h3>
-              {tasks.slice(0, 2).map((t) => (
-                <button key={t.id} onClick={() => openRecord(t)}>
-                  <CheckCircle2 size={17} />
-                  <span>
-                    <strong>{t.title}</strong>
-                    <small>
-                      {data.records.find((p) => p.id === t.project)?.title ||
-                        "Assigned to you"}{" "}
-                      · {t.status}
-                    </small>
-                  </span>
+              </div>
+              <div className="hub-panel task-panel">
+                {tasks.slice(0, 3).map((task) => {
+                  const blocked =
+                    task.status !== "Done" &&
+                    ((task.data.dependsOn as string[]) || []).some(
+                      (id) =>
+                        data.records.find((r) => r.id === id)?.status !==
+                        "Done",
+                    );
+                  return (
+                    <div
+                      className={
+                        "hub-task-row " +
+                        (task.status === "Done" ? "task-complete" : "")
+                      }
+                      key={task.id}
+                    >
+                      <input
+                        type="checkbox"
+                        aria-label={
+                          "Mark " +
+                          task.title +
+                          (task.status === "Done" ? " open" : " complete")
+                        }
+                        checked={task.status === "Done"}
+                        disabled={busy || blocked}
+                        title={
+                          blocked ? "Complete dependent tasks first" : undefined
+                        }
+                        onChange={() => onTaskToggle(task)}
+                      />
+                      <button onClick={() => openRecord(task)}>
+                        <strong>{task.title}</strong>
+                        <small>
+                          {data.records.find((r) => r.id === task.project)
+                            ?.title || task.department}
+                          {blocked ? " · Waiting for a dependency" : ""}
+                        </small>
+                      </button>
+                      <span className="task-department">
+                        {task.department === "Engineering"
+                          ? "Project"
+                          : task.department}
+                      </span>
+                      <span className="task-state">{task.status}</span>
+                    </div>
+                  );
+                })}
+                {approvals.slice(0, Math.max(0, 3 - tasks.length)).map((a) => (
+                  <div className="hub-task-row" key={a.id}>
+                    <ShieldCheck size={17} />
+                    <button onClick={() => go("approvals")}>
+                      <strong>
+                        {data.documents.find((d) => d.id === a.documentId)
+                          ?.title || "Approval request"}
+                      </strong>
+                      <small>Exact version review requested</small>
+                    </button>
+                    <span className="task-department">Review</span>
+                    <span className="task-state">Pending</span>
+                  </div>
+                ))}
+                {tasks.length === 0 && approvals.length === 0 && (
+                  <div className="hub-empty">
+                    <CheckCircle2 size={22} />
+                    <strong>You’re all caught up</strong>
+                    <p>
+                      Assigned tasks and approval requests will appear here.
+                    </p>
+                  </div>
+                )}
+                <div className="panel-footer">
+                  <ShieldCheck size={13} />
+                  Tasks and approvals from your connected workspace
+                </div>
+              </div>
+            </section>
+            <section className="organization-knowledge">
+              <div className="hub-section-heading">
+                <h2>
+                  <BookOpen size={20} />
+                  Organization knowledge
+                </h2>
+                <button onClick={() => go("documents")}>
+                  View all
+                  <ChevronRight size={15} />
                 </button>
-              ))}
-              {pending.length > 0 && (
-                <button onClick={() => go("approvals")}>
-                  <ShieldCheck size={17} />
-                  <span>
-                    <strong>
-                      {pending.length} pending{" "}
-                      {pending.length === 1 ? "approval" : "approvals"}
-                    </strong>
-                    <small>Ready for the next decision</small>
-                  </span>
-                </button>
-              )}
-              {tasks.length === 0 && pending.length === 0 && (
-                <p className="radar-empty">
-                  <CheckCircle2 size={18} />
-                  You’re all caught up.
-                  <span>New work and requests will appear here.</span>
-                </p>
-              )}
-              <button
-                className="project-shortcut"
-                onClick={() => go("projects")}
-              >
-                <Folder size={17} />
-                <span>
-                  <strong>Your projects</strong>
-                  <small>People, tasks, and shared context</small>
-                </span>
-                <ChevronRight size={14} />
-              </button>
-            </aside>
+              </div>
+              <div className="hub-panel knowledge-panel">
+                {documents.slice(0, 3).map((r) => (
+                  <button
+                    className="hub-knowledge-row"
+                    key={r.id}
+                    onClick={() => openRecord(r)}
+                  >
+                    <span className="knowledge-icon">
+                      <FileText size={20} />
+                    </span>
+                    <span>
+                      <strong>{r.title}</strong>
+                      <small>
+                        {r.department} ·{" "}
+                        {r.data.version
+                          ? "Version " + r.data.version
+                          : "Updated " +
+                            new Date(r.updated).toLocaleDateString("en-GB", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              timeZone: "Asia/Kolkata",
+                            })}
+                      </small>
+                    </span>
+                    <ChevronRight size={16} />
+                  </button>
+                ))}
+                {documents.length === 0 && (
+                  <div className="hub-empty">
+                    <BookOpen size={22} />
+                    <strong>Your company knowledge, together</strong>
+                    <p>Saved and imported documents will appear here.</p>
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
-        )}
-        {tab === "Recent documents" && (
-          <div className="feed-rows">
-            {documents.slice(0, 6).map((r) => (
-              <button
-                className="knowledge-row"
-                key={r.id}
-                onClick={() => openRecord(r)}
-              >
-                <span className="knowledge-icon">
-                  <FileText size={20} />
-                </span>
-                <span className="knowledge-content">
-                  <strong>{r.title}</strong>
-                  <span>
-                    {r.department} ·{" "}
-                    {data.users.find((u) => u.id === r.owner)?.name}
-                  </span>
-                </span>
-                <small>{shortDate(r.updated)}</small>
-                <ChevronRight size={15} />
-              </button>
-            ))}
-            {documents.length === 0 && (
-              <p className="feed-empty">Saved documents will appear here.</p>
-            )}
-          </div>
-        )}
-        {tab === "Your tasks" && (
-          <div className="feed-rows">
-            {tasks.map((r) => (
-              <button
-                className="knowledge-row"
-                key={r.id}
-                onClick={() => openRecord(r)}
-              >
-                <span className="knowledge-icon task-icon">
-                  <CheckCircle2 size={20} />
-                </span>
-                <span className="knowledge-content">
-                  <strong>{r.title}</strong>
-                  <span>
-                    {data.records.find((p) => p.id === r.project)?.title ||
-                      "Workspace task"}{" "}
-                    · {r.status}
-                  </span>
-                </span>
-                <ChevronRight size={15} />
-              </button>
-            ))}
-            {tasks.length === 0 && (
-              <p className="feed-empty">
-                You’re all caught up. New assigned tasks will appear here.
-              </p>
-            )}
-          </div>
-        )}
-      </section>
-      <p className="home-footnote">
-        <ShieldCheck size={14} />
-        Answers grounded in your workspace. Access stays with you.
-      </p>
+        </>
+      )}
     </div>
   );
 }

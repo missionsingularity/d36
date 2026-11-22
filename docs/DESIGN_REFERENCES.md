@@ -22,3 +22,11 @@ The follow-up redesign replaces the sparse landing layout with an assistant-led 
 Search adds owner/department filters and keyboard-operable record suggestions. Suggestions expand within the search area so they do not cover the result tabs. Chat renders headings/lists as readable content, keeps its composer outside the scrolling transcript, offers copy/follow-up actions, and opens all supporting evidence in a contextual Sources panel. Dialogs trap focus and restore the previous focus on close. Sidebar collapse preference persists.
 
 Singularity retains its own original branding, violet accents and local workflow features. Reviewed the public references again for this pass; this is a design interpretation rather than a claim of duplicating the authenticated Glean UI. Verified desktop, mobile and dark themes in the actual browser.
+
+## Supplied enterprise Assistant references
+
+The user supplied `BrahmaGPT Enterprise AI Dashboard-2.png` and `BrahmaGPT Enterprise Assistant Dashboard-1.png`. The second image supplies the wider unified Assistant composition; the first supplies source-rich enterprise density and sidebar proportions. The current design uses an original code-rendered BrahmaGPT flower mark, by-Singularity wordmark, organization-wide top search, centered greeting/composer, compact suggestions, a saved-policy spotlight, four real work-agent entry points, personal tasks and organization knowledge.
+
+Home and Search now share the root workspace. Search changes the root query string and displays permission-filtered results in place. The old `/search` route redirects to that shared experience. The sidebar contains no separate Search or Chat item: New chat is the first control. The Chat/Work header switch was removed. Search, source preview, conversation and execution remain connected through actual saved records.
+
+The screenshot examples contain illustrative events, names and dates. Those were not imported as company facts. Task status, approval counts, policy content and document metadata come from the local database. Featured IT/Project agents prefill reviewable work instructions; HR and Document agents open real request/document forms. No fake voice control, third-party connection, calendar event or successful execution is shown.
