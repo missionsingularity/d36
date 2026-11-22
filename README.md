@@ -16,6 +16,8 @@ npm.cmd run dev
 
 Open http://127.0.0.1:3000. The database seeds automatically on first use, so `seed` is optional. Setup preserves any existing `.env.local` and all data. No Docker or enterprise API account is required.
 
+Home and enterprise search share one Assistant workspace. Use the organization search bar (or Ctrl+K) to search in place; the query survives refresh. New chat is the first sidebar action. Featured IT/Project agents prepare reviewable instructions; HR opens a leave request and Document opens template-backed creation. The separate Search navigation and Chat/Work header switch have been replaced by this unified flow.
+
 The development launcher refuses duplicate servers and occupied ports, then clears only its generated development output before starting. Production output and your data are preserved. For ordinary use after a build, run `npm.cmd start`; use `npm.cmd run dev` when editing the code.
 
 ## Add your Gemini API key later
@@ -61,6 +63,7 @@ Install Chromium with `npx.cmd playwright install chromium` if absent. Browser t
 - `.data/enterprise.sqlite`: live enterprise database; never committed. Existing prior databases are untouched.
 - `lib/enterprise/`: retrieval, deterministic calculations, tool planner, governed execution and CSV import.
 - `app/enterprise-workspace.tsx`, `app/workspace-home.tsx`, `app/message-body.tsx`: shared shell, personalized home feed and readable chat responses.
+- `app/workspace-search.tsx`, `app/work-agents.tsx`: unified organization search and working agent entry points.
 - `app/enterprise.css` and `app/product.css`: base components and refined product styling; Inter Variable fonts are hosted locally.
 - `tests/legacy-support/`: historical synthetic fixtures and services for regression tests only.
 - `checkpoint/pre-enterprise-rebuild-20261122`: original code checkpoint in Git. Ignored `recovery-before-rebuild.bundle` is a verified full-history local backup.

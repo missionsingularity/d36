@@ -381,7 +381,7 @@ select {
   margin: 17px 0 0;
 }
 .hub-composer {
-  max-width: 1120px;
+  max-width: 1052px;
   margin: 0 auto;
 }
 .composer {
@@ -1531,8 +1531,23 @@ select {
   border-color: #493654;
 }
 @media (min-width: 1600px) {
+  .sidebar {
+    width: 266px;
+  }
+  .main-shell {
+    margin-left: 266px;
+  }
+  .sidebar nav button {
+    font-size: 15px;
+  }
+  .unified-topbar {
+    padding-left: 54px;
+  }
+  .organization-search input {
+    font-size: 14px;
+  }
   .enterprise-home {
-    padding: 32px 44px 35px;
+    padding: 26px 52px 30px;
   }
   .assistant-hero h1 {
     font-size: 35px;
@@ -1559,6 +1574,24 @@ select {
   .hub-task-row small,
   .hub-knowledge-row small {
     font-size: 11px;
+  }
+  .hub-panel {
+    min-height: 155px;
+  }
+  .hub-task-row {
+    padding: 9px 0;
+  }
+  .panel-footer {
+    padding: 8px 0;
+  }
+  .hub-knowledge-row {
+    padding: 6px 0;
+  }
+  .hub-knowledge-row strong {
+    line-height: 1.5;
+  }
+  .hub-knowledge-row small {
+    line-height: 1.45;
   }
 }
 @media (max-width: 1350px) {
