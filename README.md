@@ -16,7 +16,7 @@ npm.cmd run dev
 
 Open http://127.0.0.1:3000. The database seeds automatically on first use, so `seed` is optional. Setup preserves any existing `.env.local` and all data. No Docker or enterprise API account is required.
 
-Home and enterprise search share one Assistant workspace. Use the organization search bar (or Ctrl+K) to search in place; the query survives refresh. New chat is the first sidebar action. Featured IT/Project agents prepare reviewable instructions; HR opens a leave request and Document opens template-backed creation. The separate Search navigation and Chat/Work header switch have been replaced by this unified flow.
+Home and enterprise search share one Assistant workspace. Use the organization search bar (or Ctrl+K) to search in place; the query survives refresh. New chat is the first sidebar action. Featured agents open a detailed launch page with capabilities, version, inputs and Auto/Workflow selection. Work contains the library, runs, approvals, history, and administrator builder, tools, templates and schedules. The separate Search navigation and Chat/Work header switch have been replaced by this unified flow.
 
 The development launcher refuses duplicate servers and occupied ports, then clears only its generated development output before starting. Production output and your data are preserved. For ordinary use after a build, run `npm.cmd start`; use `npm.cmd run dev` when editing the code.
 
@@ -29,7 +29,7 @@ GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-3.8-flash
 ```
 
-Get a key from https://aistudio.google.com/apikey. Keep it private. This file is ignored by Git. Stop the running server with Ctrl+C and run `npm.cmd run dev` again. Settings includes the same instructions. A configured key enables LIVE GEMINI planning; a rejected key creates a visible failed workflow. Live service behavior has not been verified with your account.
+Get a key from https://aistudio.google.com/apikey. Keep it private. This file is ignored by Git. Stop the running server with Ctrl+C and run `npm.cmd run dev` again. Settings includes the same instructions. A configured key enables LIVE GEMINI planning; a rejected key creates a visible failed workflow. Live planning was verified with the configured account. Provider availability and model access can change; failures remain visible.
 
 Leave the key blank to use OFFLINE LOCAL MODE. Local search, predefined Alpha replacement/report workflows, editing, project creation, leave requests, imports and authorized approvals work without it.
 
@@ -53,9 +53,21 @@ npm.cmd run test:e2e
 npm.cmd run test:legacy
 npm.cmd run build
 npm.cmd start
+# In a second terminal, for unattended work and schedules:
+npm.cmd run worker
 ```
 
 Install Chromium with `npx.cmd playwright install chromium` if absent. Browser tests run their own isolated server on port 3100 and save screenshots under `.qa/`. `lint` validates formatting; TypeScript supplies static type checking. `test:legacy` retains the original government-domain service regressions, without exposing the retired application or APIs.
+
+## Work Engine
+
+Open `/work`. Published agents are versioned; running work stays pinned to its original version. Auto asks Gemini for a validated plan. Workflow executes published steps and explicit branch conditions. With no key, Auto explicitly uses the published local workflow. Conversation tool calls use this same durable executor.
+
+SQLite stores runs, steps, attempts, events, exact action gates, receipts, agent versions, launch inputs and schedules. Each local write and its step receipt commit in one transaction. Safe retry retains completed steps and permits at most three attempts per step. The worker claims persisted work with a database lease, resumes approval waits, and recovers expired claims after restart. No external procurement or HR service is contacted.
+
+Run `npm.cmd run worker` alongside the app for schedules and recovery while no browser is open. Leave both processes running for unattended work. Document approvals require an independent authorized reviewer to approve the exact version and explicitly execute; the waiting run then resumes. Other gated actions require an independent administrator decision on the resolved payload.
+
+See [Work Engine operations](docs/WORK_ENGINE.md) for builder, schedule, permission and recovery details.
 
 ## Files and recovery
 

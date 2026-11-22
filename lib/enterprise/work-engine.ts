@@ -389,6 +389,12 @@ export function engineDb() {
   c.exec(
     "CREATE TABLE IF NOT EXISTS engine_inputs(runId TEXT PRIMARY KEY,payload TEXT NOT NULL);",
   );
+  c.exec(`CREATE TRIGGER IF NOT EXISTS retain_agent_version BEFORE DELETE ON agent_versions BEGIN SELECT RAISE(ABORT,'Agent versions must be retained'); END;
+  CREATE TRIGGER IF NOT EXISTS immutable_run_identity BEFORE UPDATE OF owner,agentId,version,instruction,mode ON engine_runs BEGIN SELECT RAISE(ABORT,'Run identity and version are immutable'); END;
+  CREATE TRIGGER IF NOT EXISTS immutable_step_spec BEFORE UPDATE OF spec,runId,id ON engine_steps BEGIN SELECT RAISE(ABORT,'Validated step specifications are immutable'); END;
+  CREATE TRIGGER IF NOT EXISTS immutable_gate_payload BEFORE UPDATE OF payload,version,runId,stepId ON engine_gates BEGIN SELECT RAISE(ABORT,'Approved action payload is immutable'); END;
+  CREATE TRIGGER IF NOT EXISTS immutable_action_receipt BEFORE UPDATE ON engine_receipts BEGIN SELECT RAISE(ABORT,'Action receipts are immutable'); END;
+  CREATE TRIGGER IF NOT EXISTS retain_action_receipt BEFORE DELETE ON engine_receipts BEGIN SELECT RAISE(ABORT,'Action receipts must be retained'); END;`);
   initialized = true;
   if (!c.prepare("SELECT 1 FROM agent_versions LIMIT 1").get()) {
     const s = (
@@ -627,6 +633,7 @@ function agentVersion(id: string, version?: number): Agent {
 export function validatePlan(value: unknown, agent: Agent) {
   const p = planSchema.parse(value);
   const seen = new Set<string>();
+  const aliases = new Map<string, string>();
   for (const s of p.steps) {
     if (seen.has(s.id) || s.dependsOn.some((d) => !seen.has(d)))
       throw new Error("Dependencies must reference unique preceding steps");
@@ -638,6 +645,44 @@ export function validatePlan(value: unknown, agent: Agent) {
       throw new Error("Branch condition must be a dependency");
     if (!tools[s.tool] || !agent.config.allowedTools.includes(s.tool))
       throw new Error(`Tool not allowed: ${s.tool}`);
+    function checkRefs(v: unknown) {
+      if (typeof v === "string" && v.startsWith("$")) {
+        const ref = v.slice(1).split(".")[0],
+          source = aliases.get(ref) || ref;
+        if (
+          ref !== "input" &&
+          (!seen.has(source) || !s.dependsOn.includes(source))
+        )
+          throw new Error(
+            `Output reference requires an earlier dependency: ${v}`,
+          );
+      } else if (Array.isArray(v)) v.forEach(checkRefs);
+      else if (v && typeof v === "object") Object.values(v).forEach(checkRefs);
+    }
+    checkRefs(s.arguments);
+    const checked = tools[s.tool].schema.safeParse(s.arguments);
+    if (!checked.success) {
+      for (const issue of checked.error.issues) {
+        const at = issue.path.reduce<unknown>(
+          (v, k) =>
+            v && typeof v === "object"
+              ? (v as Record<PropertyKey, unknown>)[k]
+              : undefined,
+          s.arguments,
+        );
+        if (typeof at !== "string" || !at.startsWith("$"))
+          throw new Error(`Invalid arguments for ${s.tool}: ${issue.message}`);
+      }
+    }
+    if (s.outputKey) {
+      if (
+        seen.has(s.outputKey) ||
+        aliases.has(s.outputKey) ||
+        s.outputKey === "input"
+      )
+        throw new Error("Output keys must be unique");
+      aliases.set(s.outputKey, s.id);
+    }
     seen.add(s.id);
   }
   return p;
@@ -678,7 +723,17 @@ export function launch(u: Employee, input: unknown) {
         .default({}),
     })
     .parse(input);
-  const a = agents(u).find((a) => a.id === v.agentId);
+  const published = engineDb()
+    .prepare(
+      "SELECT version FROM agent_versions WHERE agentId=? AND json_extract(config,'$.published')=1 ORDER BY version DESC LIMIT 1",
+    )
+    .get(v.agentId) as { version: number } | undefined;
+  const a =
+    v.test && u.role === "admin"
+      ? agents(u).find((a) => a.id === v.agentId)
+      : published
+        ? agentVersion(v.agentId, published.version)
+        : undefined;
   if (!a || (!a.config.published && !(v.test && u.role === "admin")))
     throw new service.WorkspaceError("Published agent required", 403);
   const id = uid();
@@ -699,25 +754,27 @@ export function launch(u: Employee, input: unknown) {
       inputs[f.name] = value;
     }
   }
-  engineDb()
-    .prepare(
-      "INSERT INTO engine_runs(id,owner,agentId,version,instruction,mode,status,created,updated) VALUES(?,?,?,?,?,?,?,?,?)",
-    )
-    .run(
-      id,
-      u.id,
-      a.id,
-      a.version,
-      v.instruction,
-      v.mode,
-      "QUEUED",
-      timestamp(),
-      timestamp(),
-    );
-  event(id, "queued", `Pinned ${a.config.name} v${a.version}`);
-  engineDb()
-    .prepare("INSERT INTO engine_inputs VALUES(?,?)")
-    .run(id, JSON.stringify(inputs));
+  atomic(() => {
+    engineDb()
+      .prepare(
+        "INSERT INTO engine_runs(id,owner,agentId,version,instruction,mode,status,created,updated) VALUES(?,?,?,?,?,?,?,?,?)",
+      )
+      .run(
+        id,
+        u.id,
+        a.id,
+        a.version,
+        v.instruction,
+        v.mode,
+        "QUEUED",
+        timestamp(),
+        timestamp(),
+      );
+    event(id, "queued", `Pinned ${a.config.name} v${a.version}`);
+    engineDb()
+      .prepare("INSERT INTO engine_inputs VALUES(?,?)")
+      .run(id, JSON.stringify(inputs));
+  });
   return id;
 }
 // Conversations and agent launches enter the same durable executor. The chat
@@ -764,6 +821,13 @@ export function runDetail(u: Employee, id: string) {
     throw new service.WorkspaceError("Run unavailable", 403);
   return {
     ...r,
+    inputs: JSON.parse(
+      (
+        engineDb()
+          .prepare("SELECT payload FROM engine_inputs WHERE runId=?")
+          .get(id) as { payload: string } | undefined
+      )?.payload || "{}",
+    ) as Args,
     plan: JSON.parse(r.plan),
     steps: (
       engineDb()
@@ -830,12 +894,20 @@ function resolve(value: unknown, outputs: Args): unknown {
       : outputs[key];
     if (out === undefined)
       throw new Error(`Missing output reference: ${value}`);
-    return typeof out === "object" ? JSON.stringify(out, null, 2) : out;
+    return out;
   }
   if (Array.isArray(value)) return value.map((v) => resolve(v, outputs));
   if (value && typeof value === "object")
     return Object.fromEntries(
-      Object.entries(value).map(([k, v]) => [k, resolve(v, outputs)]),
+      Object.entries(value).map(([k, v]) => {
+        const out = resolve(v, outputs);
+        return [
+          k,
+          k === "content" && typeof out === "object"
+            ? JSON.stringify(out, null, 2)
+            : out,
+        ];
+      }),
     );
   return value;
 }
@@ -1091,6 +1163,7 @@ export async function tick(id: string) {
           "execute_approved_action",
           "create_document_draft",
           "create_replacement_request",
+          "create_leave_request",
         ].includes(s.tool);
       if (human) {
         const gate = engineDb()
@@ -1224,22 +1297,32 @@ export function gateDecision(u: Employee, input: unknown) {
     .get(v.runId) as RunRow | undefined;
   if (u.role !== "admin" || !r || r.owner === u.id)
     throw new service.WorkspaceError("Independent administrator required", 403);
-  const changed = engineDb()
-    .prepare(
-      "UPDATE engine_gates SET status=?,reviewer=?,reason=?,decided=? WHERE runId=? AND stepId=? AND status='PENDING' AND version=?",
-    )
-    .run(
-      v.decision === "approve" ? "APPROVED" : "REJECTED",
-      u.id,
-      v.reason,
-      timestamp(),
+  if (["CANCELLED", "COMPLETED", "FAILED"].includes(r.status))
+    throw new Error("Run is no longer awaiting this decision");
+  return atomic(() => {
+    const changed = engineDb()
+      .prepare(
+        "UPDATE engine_gates SET status=?,reviewer=?,reason=?,decided=? WHERE runId=? AND stepId=? AND status='PENDING' AND version=?",
+      )
+      .run(
+        v.decision === "approve" ? "APPROVED" : "REJECTED",
+        u.id,
+        v.reason,
+        timestamp(),
+        v.runId,
+        v.stepId,
+        r.version,
+      );
+    if (!changed.changes)
+      throw new Error("Approval is stale or already decided");
+    event(
       v.runId,
+      `approval_${v.decision}`,
+      `${u.name}: ${v.reason}`,
       v.stepId,
-      r.version,
     );
-  if (!changed.changes) throw new Error("Approval is stale or already decided");
-  event(v.runId, `approval_${v.decision}`, `${u.name}: ${v.reason}`, v.stepId);
-  log(u.id, "Work approval decision", JSON.stringify(v));
+    log(u.id, "Work approval decision", JSON.stringify(v));
+  });
 }
 export function schedule(u: Employee, input: unknown) {
   const v = z
@@ -1250,7 +1333,13 @@ export function schedule(u: Employee, input: unknown) {
       intervalHours: z.number().int().min(1).max(8760),
     })
     .parse(input);
-  if (!agents(u).some((a) => a.id === v.agentId && a.config.published))
+  if (
+    !engineDb()
+      .prepare(
+        "SELECT 1 FROM agent_versions WHERE agentId=? AND json_extract(config,'$.published')=1",
+      )
+      .get(v.agentId)
+  )
     throw new Error("Published agent required");
   const id = uid();
   engineDb()
@@ -1258,6 +1347,14 @@ export function schedule(u: Employee, input: unknown) {
     .run(id, u.id, v.agentId, v.instruction, v.nextAt, v.intervalHours);
   log(u.id, "Schedule created", id);
   return id;
+}
+export function toggleSchedule(u: Employee, id: string, enabled: boolean) {
+  const changed = engineDb()
+    .prepare("UPDATE engine_schedules SET enabled=? WHERE id=? AND owner=?")
+    .run(enabled ? 1 : 0, id, u.id);
+  if (!changed.changes)
+    throw new service.WorkspaceError("Schedule unavailable", 403);
+  log(u.id, "Schedule " + (enabled ? "enabled" : "disabled"), id);
 }
 export async function workerTick() {
   engineDb();

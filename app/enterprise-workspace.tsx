@@ -1392,7 +1392,15 @@ export default function EnterpriseWorkspace() {
       return <div className="standard-page">{workflowView(run)}</div>;
     if (section === "work")
       return (
-        <WorkEngine user={data.user} onApprovals={() => go("approvals")} />
+        <WorkEngine
+          user={data.user}
+          workspace={data}
+          onOpenSource={openRecord}
+          onTask={(id, status) => {
+            void act({ action: "task", id, status });
+          }}
+          onApprovals={() => go("approvals")}
+        />
       );
     if (section === "approvals")
       return (

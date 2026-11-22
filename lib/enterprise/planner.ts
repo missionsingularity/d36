@@ -2,16 +2,7 @@ import { launchConversation, tick, runDetail, type Plan } from "./work-engine";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { db, uid, timestamp, log, atomic } from "./db";
-import {
-  search,
-  progress,
-  replacement,
-  draft,
-  submit,
-  getRecord,
-  document,
-  WorkspaceError,
-} from "./service";
+import { document, WorkspaceError } from "./service";
 import type { Employee, RecordItem, ToolEvent, Workflow } from "./types";
 import { DEFAULT_GEMINI_MODEL, geminiFailure } from "./gemini";
 

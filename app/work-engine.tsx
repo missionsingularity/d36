@@ -14,7 +14,7 @@ import {
   Square,
   RotateCcw,
 } from "lucide-react";
-import type { Employee } from "@/lib/enterprise/types";
+import type { Employee, Snapshot, RecordItem } from "@/lib/enterprise/types";
 import MessageBody from "./message-body";
 import type {
   Agent,
@@ -55,9 +55,15 @@ const initial = {
 export default function WorkEngine({
   user,
   onApprovals,
+  workspace,
+  onOpenSource,
+  onTask,
 }: {
   user: Employee;
   onApprovals: () => void;
+  workspace: Snapshot;
+  onOpenSource: (r: RecordItem) => void;
+  onTask: (id: string, status: string) => void;
 }) {
   const router = useRouter(),
     params = useSearchParams();
@@ -424,6 +430,13 @@ export default function WorkEngine({
                   className="engine-source"
                   key={r.id}
                   href={"/?q=" + encodeURIComponent(r.title)}
+                  onClick={(e) => {
+                    const record = workspace.records.find((s) => s.id === r.id);
+                    if (record) {
+                      e.preventDefault();
+                      onOpenSource(record);
+                    }
+                  }}
                 >
                   <FileText size={16} />
                   <span>
@@ -821,10 +834,19 @@ export default function WorkEngine({
               id: string;
               instruction: string;
               nextAt: string;
+              enabled: number;
             }[]
           ).map((s) => (
             <p key={s.id}>
               {s.instruction} · {new Date(s.nextAt).toLocaleString()}
+              <button
+                disabled={busy}
+                onClick={() =>
+                  action("scheduleToggle", { id: s.id, enabled: !s.enabled })
+                }
+              >
+                {s.enabled ? "Disable" : "Enable"}
+              </button>
             </p>
           ))}
         </section>
@@ -929,6 +951,33 @@ export default function WorkEngine({
                   <Play size={16} /> Explore agents
                 </button>
               </div>
+              <div className="engine-card engine-intent">
+                <label>
+                  Ask BrahmaGPT to carry out work
+                  <textarea
+                    value={instruction}
+                    onChange={(e) => setInstruction(e.target.value)}
+                    placeholder="Prepare a project report, research a policy, or review IT replacements…"
+                  />
+                </label>
+                <button
+                  className="primary"
+                  disabled={busy || !instruction.trim()}
+                  onClick={async () => {
+                    const agentId = /laptop|replace|incident/i.test(instruction)
+                      ? "it"
+                      : /project|report|progress/i.test(instruction)
+                        ? "project"
+                        : "research";
+                    const id = await action("launch", {
+                      input: { agentId, instruction, mode: "auto" },
+                    });
+                    if (id) router.push("/work?run=" + id);
+                  }}
+                >
+                  <Play size={16} /> Start in Auto
+                </button>
+              </div>
               <div className="engine-metrics">
                 {[
                   [
@@ -982,6 +1031,65 @@ export default function WorkEngine({
                     <small>Review capabilities & launch →</small>
                   </button>
                 ))}
+              </div>
+              <div className="engine-home-panels">
+                <section className="engine-card">
+                  <div className="hub-section-heading">
+                    <h2>Assigned to you</h2>
+                    <CheckCircle2 size={18} />
+                  </div>
+                  {workspace.records
+                    .filter(
+                      (r) =>
+                        r.type === "Tasks" &&
+                        r.owner === user.id &&
+                        r.status !== "Done",
+                    )
+                    .slice(0, 4)
+                    .map((r) => (
+                      <div className="engine-assigned" key={r.id}>
+                        <input
+                          type="checkbox"
+                          aria-label={"Complete " + r.title}
+                          disabled={((r.data.dependsOn as string[]) || []).some(
+                            (id) =>
+                              workspace.records.find((t) => t.id === id)
+                                ?.status !== "Done",
+                          )}
+                          onChange={() => onTask(r.id, "Done")}
+                        />
+                        <button onClick={() => onOpenSource(r)}>
+                          <strong>{r.title}</strong>
+                          <small>
+                            {r.status} · {r.project || r.department}
+                          </small>
+                        </button>
+                      </div>
+                    ))}
+                </section>
+                <section className="engine-card">
+                  <div className="hub-section-heading">
+                    <h2>Company knowledge</h2>
+                    <FileText size={18} />
+                  </div>
+                  {workspace.records
+                    .filter((r) => r.type === "Documents")
+                    .slice(0, 4)
+                    .map((r) => (
+                      <button
+                        className="engine-knowledge"
+                        key={r.id}
+                        onClick={() => onOpenSource(r)}
+                      >
+                        <FileText size={18} />
+                        <span>
+                          <strong>{r.title}</strong>
+                          <small>{r.department}</small>
+                        </span>
+                        <ArrowUpRight size={15} />
+                      </button>
+                    ))}
+                </section>
               </div>
             </>
           )}

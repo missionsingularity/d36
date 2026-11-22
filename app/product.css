@@ -2244,6 +2244,67 @@ select {
   text-decoration: none;
   line-height: 1.5;
 }
+.engine-intent {
+  position: relative;
+  border-color: #9687f0;
+}
+.engine-intent label {
+  margin-top: 0;
+}
+.engine-intent textarea {
+  border: 0;
+  padding-left: 0;
+  min-height: 90px;
+  font-size: 16px;
+}
+.engine-home-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+.engine-home-panels h2 {
+  font-size: 18px;
+}
+.engine-assigned {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.engine-assigned button {
+  flex: 1;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  color: var(--text);
+}
+.engine-assigned strong,
+.engine-knowledge strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+.engine-knowledge {
+  display: flex;
+  gap: 11px;
+  width: 100%;
+  align-items: center;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  text-align: left;
+  color: var(--text);
+}
+.engine-knowledge span {
+  flex: 1;
+}
+@media (max-width: 700px) {
+  .engine-home-panels {
+    grid-template-columns: 1fr;
+  }
+}
 .engine-source svg {
   flex-shrink: 0;
   color: var(--accent);

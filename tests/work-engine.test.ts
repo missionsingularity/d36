@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 process.env.BRAHMA_DATA_DIR = fs.mkdtempSync(
   path.join(os.tmpdir(), "brahma-engine-"),
 );
@@ -134,17 +135,28 @@ test("durable Work Engine scenarios", async (t) => {
       assert.match(document(maya, d.id).versions[0].content, /percent/);
     },
   );
-  await t.test("leave approval executes once", () => {
-    const d = requestLeave(maya, {
-      start: "2026-12-07",
-      end: "2026-12-08",
-      reason: "Annual leave",
+  await t.test("leave agent inputs, approval and execution once", async () => {
+    const id = launch(maya, {
+      agentId: "hr",
+      instruction: "Request annual leave",
+      mode: "workflow",
+      inputs: {
+        requestLeave: true,
+        start: "2026-12-07",
+        end: "2026-12-08",
+        reason: "Annual leave",
+      },
     });
-    const a = submit(maya, d.id);
+    await tick(id);
+    const run = runDetail(maya, id);
+    assert.equal(run.status, "WAITING_FOR_APPROVAL");
+    const a = run.steps.find((s) => s.id === "approval")!.output as string;
     decide(hr, { id: a, decision: "approve" });
     const first = execute(hr, a);
     assert.deepEqual(execute(hr, a), first);
     assert.equal(employee("maya").leaveBalance, 16);
+    await tick(id);
+    assert.equal(runDetail(maya, id).status, "COMPLETED");
   });
   await t.test(
     "research sources preserve real IDs and enforce HR scope",
@@ -318,9 +330,137 @@ test("durable Work Engine scenarios", async (t) => {
           "UPDATE engine_runs SET lease=?,planningOwner='old-process' WHERE id=?",
         )
         .run(Date.now() - 1000, id);
-      await workerTick();
+      const child = spawnSync(
+        process.execPath,
+        [
+          path.resolve("node_modules/tsx/dist/cli.mjs"),
+          "-e",
+          `const {workerTick}=require('./lib/enterprise/work-engine');workerTick().catch(e=>{console.error(e.message);process.exitCode=1;});`,
+        ],
+        {
+          env: process.env,
+          encoding: "utf8",
+          timeout: 30000,
+          windowsHide: true,
+        },
+      );
+      assert.equal(child.status, 0, child.stderr);
       assert.equal(runDetail(maya, id).status, "COMPLETED");
       assert.throws(() => runDetail(employee("noah"), id), /unavailable/);
+    },
+  );
+  await t.test(
+    "Auto retries provider failure and validates every step before writes",
+    async () => {
+      const original = globalThis.fetch;
+      process.env.GEMINI_API_KEY = "isolated-test-key";
+      let calls = 0;
+      const response = (text: string) =>
+        new Response(
+          JSON.stringify({
+            candidates: [{ content: { role: "model", parts: [{ text }] } }],
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        );
+      try {
+        globalThis.fetch = async () => {
+          calls++;
+          return calls === 1
+            ? new Response(
+                JSON.stringify({
+                  error: {
+                    code: 503,
+                    message: "Unavailable",
+                    status: "UNAVAILABLE",
+                  },
+                }),
+                {
+                  status: 503,
+                  headers: { "Content-Type": "application/json" },
+                },
+              )
+            : response(
+                JSON.stringify({
+                  steps: [
+                    {
+                      id: "project",
+                      tool: "get_project",
+                      arguments: { id: "alpha" },
+                      dependsOn: [],
+                      approvalPolicy: "none",
+                    },
+                  ],
+                }),
+              );
+        };
+        const id = await start("research", "auto");
+        assert.equal(runDetail(maya, id).status, "COMPLETED");
+        assert.equal(calls, 2);
+        const before = (
+          db().prepare("SELECT COUNT(*) n FROM documents").get() as {
+            n: number;
+          }
+        ).n;
+        globalThis.fetch = async () =>
+          response(
+            JSON.stringify({
+              steps: [
+                {
+                  id: "draft",
+                  tool: "create_document_draft",
+                  arguments: {
+                    title: "Must not exist",
+                    content: "Invalid later step",
+                  },
+                  dependsOn: [],
+                },
+                {
+                  id: "invalid",
+                  tool: "get_project",
+                  arguments: { unknown: "bad" },
+                  dependsOn: ["draft"],
+                },
+              ],
+            }),
+          );
+        const failed = await start("research", "auto");
+        assert.equal(runDetail(maya, failed).status, "FAILED");
+        assert.equal(
+          (
+            db().prepare("SELECT COUNT(*) n FROM documents").get() as {
+              n: number;
+            }
+          ).n,
+          before,
+        );
+      } finally {
+        globalThis.fetch = original;
+        delete process.env.GEMINI_API_KEY;
+      }
+    },
+  );
+  await t.test(
+    "agent knowledge scope filters search and blocks out-of-scope IDs",
+    async () => {
+      const a = saveAgent(admin, {
+        name: "IT only",
+        description: "IT-only sources",
+        instructions: "IT only",
+        scopes: ["IT"],
+        allowedTools: ["get_project"],
+        steps: [
+          {
+            id: "read",
+            tool: "get_project",
+            arguments: { id: "alpha" },
+            dependsOn: [],
+          },
+        ],
+        published: true,
+      });
+      const id = await start(a.id);
+      assert.equal(runDetail(maya, id).status, "FAILED");
+      assert.match(runDetail(maya, id).error, /outside agent knowledge scope/);
     },
   );
 });

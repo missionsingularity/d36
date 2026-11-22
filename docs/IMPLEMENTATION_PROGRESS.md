@@ -82,3 +82,10 @@ The final standard production build also passed and is running on port 3000. Pro
 ## Supplied lotus logo
 
 Replaced the generated flower with the user's `brahmagpt_lotus_white.svg`. Preserved the original path and white fill; cropped only empty viewBox space. Added an indigo backing for contrast in both themes and a matching favicon. The shared mark updates the sidebar, Assistant emblem and chat avatars. TypeScript and formatting checks passed; preview images loaded successfully and the favicon returned HTTP 200. This change implements the explicit logo request; the separate attached Work Engine specification is not represented as implemented by this branding update.
+
+
+## Enterprise Work Engine implementation
+
+Added versioned six-agent library, detailed launch inputs, Auto/Workflow modes, administrator builder/test/publish, tools and templates, SQLite queue/steps/attempts/events/gates/receipts/schedules, role/scoped tools, independent exact action decisions, document rejection history, safe retry/cancel/pause, actual process-restart recovery and worker-driven approval continuation. Conversations use the same durable engine. Readable artifacts and contextual sources retain the unified Home/Search design and supplied lotus branding. Local operations and limitations are in WORK_ENGINE.md.
+
+Final Work Engine verification: production build, TypeScript and formatting passed; 34 backend checks and six Chromium flows passed. A real Gemini Auto research run completed with search_records after a temporary provider-busy failure and safe retry. The production app and SQLite worker were started locally. No keys, database files or QA images were staged; no remote push was attempted.

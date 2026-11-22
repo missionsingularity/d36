@@ -10,6 +10,7 @@ import {
   saveAgent,
   gateDecision,
   schedule,
+  toggleSchedule,
 } from "@/lib/enterprise/work-engine";
 import { z } from "zod";
 export const runtime = "nodejs";
@@ -82,6 +83,10 @@ export async function POST(req: NextRequest) {
         break;
       case "schedule":
         result = schedule(u, b.input);
+        break;
+      case "scheduleToggle":
+        toggleSchedule(u, z.string().parse(b.id), z.boolean().parse(b.enabled));
+        result = true;
         break;
       default:
         throw new Error("Unknown action");

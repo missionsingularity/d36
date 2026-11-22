@@ -1,13 +1,14 @@
 # Singularity enterprise workspace
 
-One root Next.js App Router application. `/` and the catch-all route render the shared client shell. `/api/workspace` is a server-only, same-origin endpoint. No mandatory external enterprise integrations, Docker, PostgreSQL or Redis.
+One root Next.js App Router application. `/` and the catch-all route render the shared client shell. `/api/workspace` and `/api/work-engine` are server-only, same-origin endpoints. No mandatory external enterprise integrations, Docker, PostgreSQL or Redis.
 
 ## Modules
 
 - **Brahma**: `lib/enterprise/service.ts` retrieves permission-filtered records through SQLite FTS5. Search, citations, previews and planner evidence share the access check. Private HR material is limited to its owner, HR Manager or administrator.
 - **Vishnu**: linked projects, members, tasks, assets and incidents; deterministic project completion, task dependency checks, replacement eligibility and working-day leave calculations. `relationships` indexes typed edges. Business calculations use saved records rather than model arithmetic.
 - **Mahesh**: immutable draft versions, review/return, exact-version independent approval, governed execution, idempotent receipts, notifications and audit history.
-- **Planner**: official `@google/genai` SDK, structured JSON schema and strict Zod validation, at most eight sequential registered tools. Tool arguments and resource permissions are checked again at execution. No arbitrary code or SQL tools. Gemini never approves or executes actions. Offline mode uses clearly labeled predefined workflows.
+- **Work Engine**: `lib/enterprise/work-engine.ts` supplies a shared SQLite-backed executor for conversations and agent launches. Published agent versions, validated plans, explicit dependencies/conditions, launch inputs, tool permissions, scope filters, attempts, events, exact action gates and receipts persist independently of browser sessions. Local tool writes and their receipts share one atomic transaction. `scripts/work-engine-worker.ts` polls queued work, expired leases, schedules and approval waits. See [operations](WORK_ENGINE.md).
+- **Planner**: official `@google/genai` SDK, structured JSON schema and strict Zod validation, the conversation planner accepts at most eight sequential tool requests and translates them into the shared engine. Auto agents accept at most twenty validated steps with dependencies and branches. Tool arguments and resource permissions are checked again at execution. No arbitrary code or SQL tools. Gemini never approves or executes actions. Offline mode uses clearly labeled predefined workflows.
 
 ## Persistence
 
