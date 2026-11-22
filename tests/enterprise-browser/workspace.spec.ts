@@ -300,23 +300,32 @@ test("unified Home search, featured agents and keyboard source previews work", a
   await page
     .getByRole("button", { name: "Open IT Operations Agent", exact: true })
     .click();
-  await expect(page).toHaveURL(/agent=it/);
+  await expect(page).toHaveURL(/work\?agent=it/);
   await expect(
-    page.getByRole("textbox", { name: "Ask, search, or create anything" }),
-  ).toHaveValue(/replacement requests/);
+    page
+      .getByRole("heading", { name: "IT Operations Agent", exact: true })
+      .first(),
+  ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Work mode", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await page
-    .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: "Home", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Open Project Agent", exact: true })
-    .click();
-  await expect(
-    page.getByRole("textbox", { name: "Ask, search, or create anything" }),
-  ).toHaveValue(/progress report/);
+    page.getByRole("button", { name: "Run agent", exact: true }),
+  ).toBeVisible();
+  for (const [id, name] of [
+    ["project", "Project Agent"],
+    ["hr", "HR Agent"],
+    ["document", "Document Agent"],
+  ]) {
+    await page.goto("/");
+    await page
+      .getByRole("button", { name: "Open " + name, exact: true })
+      .click();
+    await expect(page).toHaveURL(new RegExp("agent=" + id));
+    await expect(
+      page.getByRole("heading", { name, exact: true }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Run agent", exact: true }),
+    ).toBeVisible();
+  }
   await page
     .getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "New chat", exact: true })
@@ -324,20 +333,7 @@ test("unified Home search, featured agents and keyboard source previews work", a
   await expect(
     page.getByRole("textbox", { name: "Ask, search, or create anything" }),
   ).toHaveValue("");
-  await page
-    .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: "Home", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Open HR Agent", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("button", { name: "Close dialog" }).click();
-  await page
-    .getByRole("button", { name: "Open Document Agent", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.goto("/");
   await input.fill("Alpha");
   await page
     .getByRole("button", { name: "Ask BrahmaGPT", exact: true })

@@ -269,7 +269,7 @@ export function decide(u: Employee, input: unknown) {
   const v = z
     .object({
       id: text,
-      decision: z.enum(["approve", "return"]),
+      decision: z.enum(["approve", "return", "reject"]),
       comment: z.string().max(2000).default(""),
     })
     .parse(input);
@@ -288,9 +288,25 @@ export function decide(u: Employee, input: unknown) {
     const d = document(u, a.documentId);
     if (d.versions.at(-1)?.id !== a.versionId)
       throw new WorkspaceError("Approval version mismatch", 409);
-    if (v.decision === "return" && !v.comment.trim())
+    if (v.decision !== "approve" && !v.comment.trim())
       throw new WorkspaceError("Add reviewer comments before returning");
-    const status = v.decision === "approve" ? "APPROVED" : "RETURNED";
+    const status =
+      v.decision === "approve"
+        ? "APPROVED"
+        : v.decision === "reject"
+          ? "REJECTED"
+          : "RETURNED";
+    db()
+      .prepare("INSERT INTO approval_decisions VALUES(?,?,?,?,?,?,?)")
+      .run(
+        uid(),
+        a.id,
+        a.versionId,
+        u.id,
+        v.decision,
+        v.comment || "Approved exact document version",
+        timestamp(),
+      );
     db()
       .prepare("UPDATE approvals SET status=?,comment=? WHERE id=?")
       .run(status, v.comment, a.id);

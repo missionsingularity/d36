@@ -1,3 +1,4 @@
+import { launchConversation, tick, runDetail, type Plan } from "./work-engine";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { db, uid, timestamp, log, atomic } from "./db";
@@ -146,9 +147,6 @@ export async function runChat(u: Employee, input: unknown) {
     created: timestamp(),
   };
   let content = "";
-  let context = "";
-  let kind: "note" | "replacement" | "task" = "note";
-  let target = "";
   let failure = "";
   try {
     const { plan, mode } = await getPlan(args.prompt, (attempt) =>
@@ -166,93 +164,149 @@ export async function runChat(u: Employee, input: unknown) {
       detail: `${plan.steps.length} registered tools validated (${mode}).`,
       at: timestamp(),
     });
-    for (const s of plan.steps) {
-      let detail = "";
-      if (s.tool === "search_records") {
-        const result = search(u, s.query || args.prompt);
-        run.sources.push(...result);
-        context = result.map((r) => `${r.title}\n${r.body}`).join("\n\n");
-        detail = `Retrieved ${result.length} permitted records from SQLite FTS5.`;
-        content =
-          context ||
-          "No matching permitted records. Try a document title, project, person, or incident.";
-      } else if (s.tool === "get_record") {
-        if (!s.resourceId) throw new WorkspaceError("Resource ID required");
-        const r = getRecord(u, s.resourceId);
-        run.sources.push(r);
-        context = r.title + "\n" + r.body;
-        content = context;
-        detail = "Retrieved " + r.title;
-      } else if (s.tool === "calculate_project_progress") {
-        const p = progress(u, s.resourceId || "alpha");
-        run.sources.push(p.project, ...p.tasks);
-        context = `# ${p.project.title} · progress report\n\n${p.done} of ${p.total} tasks complete (${p.percent}%).\n\n${p.tasks.map((t) => `- ${t.title}: ${t.status}`).join("\n")}\n\nCalculated from saved tasks. No estimated progress or invented milestones.`;
-        content = context;
-        detail = `Computed ${p.done}/${p.total} tasks = ${p.percent}%.`;
-        kind = "note";
-        target = p.project.id;
-      } else if (s.tool === "evaluate_replacement_policy") {
-        const r = replacement(u, s.resourceId || "asset-1");
-        run.sources.push(r.asset, r.policy, ...r.incidents);
-        if (!r.eligible)
-          throw new WorkspaceError(
-            "Asset does not meet the saved replacement policy",
-          );
-        context = `# Laptop replacement request\n\nAsset: ${r.asset.title} (${r.asset.id})\nAge: ${r.asset.data.ageYears} years. Recorded failures: ${r.asset.data.failures}.\n\nUnresolved incidents:\n${r.incidents.map((i) => `- ${i.title} (${i.id}): ${i.status}`).join("\n")}\n\nPolicy: ${r.policy.body}\n\nRecommendation: replace the eligible asset. IT Manager approval is required before creating a local procurement record.\n\nSources: ${[r.asset.id, r.policy.id, ...r.incidents.map((i) => i.id)].join(", ")}`;
-        content = context;
-        kind = "replacement";
-        target = r.asset.id;
-        detail = `Checked asset age and failures against saved policy; ${r.incidents.length} unresolved incidents.`;
+    const converted: Plan["steps"] = [];
+    let evidence = "",
+      draftId = "",
+      replacementId = "",
+      taskTarget = "";
+    for (const [index, s] of plan.steps.entries()) {
+      const id = "step-" + index;
+      let tool: string = s.tool;
+      let arguments_: Record<string, unknown> = {};
+      if (s.tool === "search_records")
+        arguments_ = { query: s.query || args.prompt };
+      else if (s.tool === "get_record") arguments_ = { id: s.resourceId || "" };
+      else if (s.tool === "calculate_project_progress")
+        arguments_ = { id: s.resourceId || "alpha" };
+      else if (s.tool === "evaluate_replacement_policy") {
+        tool = "evaluate_replacement_eligibility";
+        replacementId = s.resourceId || "asset-1";
+        arguments_ = { id: replacementId };
       } else if (s.tool === "propose_task") {
-        const p = getRecord(u, s.resourceId || "alpha");
-        if (p.type !== "Projects")
-          throw new WorkspaceError("Task requires a valid project");
-        kind = "task";
-        target = p.id;
-        context = `Proposed task for ${p.title}\n\n${args.prompt}\n\nRequires independent approval before a task record is created.`;
-        const d = draft(u, {
-          title: "Task proposal · " + p.title,
-          content: context,
-          kind,
-          target,
-          department: u.department,
-        });
-        run.documentId = d.id;
-        detail = "Saved task proposal " + d.id;
-        content = context;
+        tool = "create_document_draft";
+        taskTarget = s.resourceId || "alpha";
+        arguments_ = {
+          title: "Task proposal",
+          content: args.prompt,
+          kind: "task",
+          target: taskTarget,
+        };
+        draftId = id;
       } else if (s.tool === "create_document_draft") {
-        if (!context)
+        if (!evidence)
           throw new WorkspaceError("Retrieve evidence before drafting");
-        const d = draft(u, {
-          title:
-            kind === "replacement"
-              ? "Laptop replacement · Project Alpha"
-              : kind === "task"
-                ? "Proposed task"
-                : "Project report",
-          content: context,
-          kind,
-          target,
-          department: u.department,
-        });
-        run.documentId = d.id;
-        detail = "Saved immutable draft version 1: " + d.id;
-        content = "A draft has been saved in Documents.\n\n" + context;
+        if (replacementId) {
+          tool = "create_replacement_request";
+          arguments_ = { id: replacementId };
+        } else
+          arguments_ = {
+            title: "Project report",
+            content: "$" + evidence,
+            kind: "note",
+            target: taskTarget,
+          };
+        draftId = id;
       } else if (s.tool === "submit_approval") {
-        if (!run.documentId)
+        if (!draftId)
           throw new WorkspaceError("Create a draft before requesting approval");
-        const id = submit(u, run.documentId);
-        detail = "Approval request saved: " + id;
-        content +=
-          "\n\nSubmitted for independent approval. No action has been executed.";
+        arguments_ = { id: "$" + draftId + ".id" };
       }
-      run.events.push({
-        tool: s.tool,
-        status: "completed",
-        detail,
-        at: timestamp(),
+      converted.push({
+        id,
+        tool,
+        arguments: arguments_,
+        dependsOn: index ? [converted[index - 1].id] : [],
+        approvalPolicy: "none",
       });
+      if (
+        [
+          "search_records",
+          "get_record",
+          "calculate_project_progress",
+          "evaluate_replacement_policy",
+        ].includes(s.tool)
+      )
+        evidence = id;
     }
+    if (converted.at(-1)?.tool === "submit_approval")
+      converted.push({
+        id: "execution",
+        tool: "execute_approved_action",
+        arguments: { id: "$" + converted.at(-1)!.id },
+        dependsOn: [converted.at(-1)!.id],
+        approvalPolicy: "none",
+      });
+    const durableId = launchConversation(u, args.prompt, { steps: converted });
+    run.id = durableId;
+    await tick(durableId);
+    const execution = runDetail(u, durableId);
+    const sourceMap = new Map<string, RecordItem>();
+    function gather(value: unknown) {
+      if (Array.isArray(value)) {
+        value.forEach(gather);
+        return;
+      }
+      if (value && typeof value === "object") {
+        const v = value as Record<string, unknown>;
+        if (
+          typeof v.id === "string" &&
+          typeof v.body === "string" &&
+          typeof v.type === "string"
+        )
+          sourceMap.set(v.id, v as RecordItem);
+        Object.values(v).forEach(gather);
+      }
+    }
+    for (const s of execution.steps) {
+      gather(s.output);
+      if (s.status === "COMPLETED")
+        run.events.push({
+          tool:
+            s.spec.tool === "evaluate_replacement_eligibility"
+              ? "evaluate_replacement_policy"
+              : s.spec.tool,
+          status: "completed",
+          detail: "Saved tool output: " + s.spec.tool,
+          at: timestamp(),
+        });
+      if (s.output && typeof s.output === "object" && "versions" in s.output)
+        run.documentId = (s.output as { id: string }).id;
+    }
+    run.sources = [...sourceMap.values()];
+    if (execution.status === "FAILED")
+      throw new WorkspaceError(execution.error);
+    const projectOutput = execution.steps.find(
+      (s) => s.spec.tool === "calculate_project_progress",
+    )?.output as
+      | {
+          project: RecordItem;
+          done: number;
+          total: number;
+          percent: number;
+          tasks: RecordItem[];
+        }
+      | undefined;
+    content = projectOutput
+      ? "# " +
+        projectOutput.project.title +
+        " ? progress report\n\n" +
+        projectOutput.done +
+        " of " +
+        projectOutput.total +
+        " tasks complete (" +
+        projectOutput.percent +
+        "%).\n\n" +
+        projectOutput.tasks
+          .map((t) => "- " + t.title + ": " + t.status)
+          .join("\n")
+      : run.sources.map((r) => "## " + r.title + "\n" + r.body).join("\n\n") ||
+        "No matching permitted records. Try a document title, project, person, or incident.";
+    if (run.documentId)
+      content = "A draft has been saved in Documents.\n\n" + content;
+    if (execution.status === "WAITING_FOR_APPROVAL")
+      content +=
+        "\n\nSubmitted for independent approval. No action has been executed.";
+
     run.status =
       run.documentId &&
       document(u, run.documentId).status === "PENDING_APPROVAL"

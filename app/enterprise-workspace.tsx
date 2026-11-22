@@ -53,6 +53,7 @@ import { useTheme } from "./theme-provider";
 import WorkspaceHome from "./workspace-home";
 import MessageBody from "./message-body";
 import WorkspaceSearch from "./workspace-search";
+import WorkEngine from "./work-engine";
 import WorkAgents, { agentStarters, type WorkAgent } from "./work-agents";
 import type {
   Snapshot,
@@ -363,20 +364,7 @@ export default function EnterpriseWorkspace() {
     );
   }
   function selectAgent(agent: WorkAgent) {
-    if (agent === "hr") {
-      leaveForm();
-      return;
-    }
-    if (agent === "document") {
-      newDocument(
-        (
-          data?.settings.templates as
-            { name: string; content: string }[] | undefined
-        )?.[0],
-      );
-      return;
-    }
-    router.push("/chat?agent=" + agent, { scroll: false });
+    router.push("/work?agent=" + agent, { scroll: false });
   }
   function go(path: string) {
     if (path === "search") {
@@ -431,6 +419,33 @@ export default function EnterpriseWorkspace() {
   async function send(text = prompt) {
     if (!text.trim() || busy) return;
     const value = text;
+    if (workMode) {
+      setBusy(true);
+      try {
+        const agentId = /laptop|replace|incident/i.test(value)
+          ? "it"
+          : /project|report|progress/i.test(value)
+            ? "project"
+            : "research";
+        const response = await fetch("/api/work-engine", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "launch",
+            input: { agentId, instruction: value, mode: "auto" },
+          }),
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error);
+        setPrompt("");
+        router.push("/work?run=" + body.result);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unable to start work");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     setPrompt("");
     try {
       const out = await post({
@@ -1377,80 +1392,7 @@ export default function EnterpriseWorkspace() {
       return <div className="standard-page">{workflowView(run)}</div>;
     if (section === "work")
       return (
-        <div className="standard-page">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">FROM INTENT TO OUTCOME</span>
-              <h1>Work & agents</h1>
-              <p className="muted">
-                Real tool operations, saved outputs, and a clear trail.
-              </p>
-            </div>
-            <button className="primary" onClick={() => go("chat")}>
-              <Plus size={16} />
-              Start work
-            </button>
-          </div>
-          <WorkAgents onSelect={selectAgent} busy={busy} />
-          <button className="approval-banner" onClick={() => go("approvals")}>
-            <ShieldCheck size={20} />
-            <span>
-              <strong>Review & approvals</strong>
-              <small>
-                {
-                  data.approvals.filter((a) => a.status === "PENDING_APPROVAL")
-                    .length
-                }{" "}
-                pending in your workspace
-              </small>
-            </span>
-            <ChevronRight size={17} />
-          </button>
-          {data.workflows.length ? (
-            data.workflows.map((w) => (
-              <button
-                className="work-list-row"
-                key={w.id}
-                onClick={() => go("work/" + w.id)}
-              >
-                <Briefcase size={18} />
-                <span>
-                  <strong>{w.objective}</strong>
-                  <small>
-                    {w.events.length} events · {date(w.created)} · {w.mode}
-                  </small>
-                </span>
-                <Status>{w.status}</Status>
-                <ChevronRight size={16} />
-              </button>
-            ))
-          ) : (
-            <Empty title="Great work starts with a question">
-              Ask BrahmaGPT to prepare a report or review laptop replacements.
-            </Empty>
-          )}
-          <h3 className="spaced">Assigned to you</h3>
-          {data.records
-            .filter((r) => r.type === "Tasks" && r.owner === data.user.id)
-            .map((r) => (
-              <div className="task-row" key={r.id}>
-                <CheckCircle2 size={18} />
-                <span>{r.title}</span>
-                <select
-                  aria-label={"Task status for " + r.title}
-                  value={r.status}
-                  disabled={busy}
-                  onChange={(e) =>
-                    act({ action: "task", id: r.id, status: e.target.value })
-                  }
-                >
-                  {["Open", "In progress", "Done"].map((s) => (
-                    <option key={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-            ))}
-        </div>
+        <WorkEngine user={data.user} onApprovals={() => go("approvals")} />
       );
     if (section === "approvals")
       return (
@@ -1517,6 +1459,27 @@ export default function EnterpriseWorkspace() {
                         }
                       >
                         Return with comments
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          form(
+                            "Reject version",
+                            <label>
+                              Reason
+                              <textarea name="comment" required rows={4} />
+                            </label>,
+                            async (f) =>
+                              post({
+                                action: "decide",
+                                id: a.id,
+                                decision: "reject",
+                                comment: f.get("comment"),
+                              }),
+                          )
+                        }
+                      >
+                        Reject version
                       </button>
                       <button
                         className="primary"

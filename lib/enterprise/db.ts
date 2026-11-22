@@ -42,6 +42,7 @@ export function db() {
  CREATE TABLE IF NOT EXISTS imports(id TEXT PRIMARY KEY,actor TEXT NOT NULL,kind TEXT NOT NULL,receipt TEXT NOT NULL,created TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY CHECK(id=1),payload TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS search_history(id TEXT PRIMARY KEY,userId TEXT NOT NULL,query TEXT NOT NULL,created TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS approval_decisions(id TEXT PRIMARY KEY,approvalId TEXT NOT NULL REFERENCES approvals(id),versionId TEXT NOT NULL REFERENCES versions(id),actor TEXT NOT NULL,decision TEXT NOT NULL,reason TEXT NOT NULL,created TEXT NOT NULL);
  INSERT OR IGNORE INTO migrations VALUES(1,datetime('now'));`);
   connection = c;
   if (!c.prepare("SELECT id FROM employees LIMIT 1").get()) seed(c);
@@ -49,6 +50,7 @@ export function db() {
 }
 export function atomic<T>(fn: () => T): T {
   const c = db();
+  if (c.inTransaction) return c.transaction(fn)();
   c.exec("BEGIN IMMEDIATE");
   try {
     const out = fn();
