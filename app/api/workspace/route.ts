@@ -10,6 +10,7 @@ import {
   insertRecord,
   timestamp,
   atomic,
+  dataDirectory,
 } from "@/lib/enterprise/db";
 import {
   employee,
@@ -393,8 +394,13 @@ export async function GET(req: NextRequest) {
       )
         throw new WorkspaceError("That source file is not available", 404);
       const root = path.resolve(process.cwd());
-      const absolutePath = path.resolve(root, relativePath);
-      const relativeToRoot = path.relative(root, absolutePath);
+      const generatedRoot = path.join(dataDirectory(), "generated");
+      const isGenerated = relativePath.startsWith("@generated/");
+      const allowedRoot = isGenerated ? generatedRoot : root;
+      const absolutePath = isGenerated
+        ? path.resolve(generatedRoot, relativePath.slice("@generated/".length))
+        : path.resolve(root, relativePath);
+      const relativeToRoot = path.relative(allowedRoot, absolutePath);
       if (
         path.isAbsolute(relativeToRoot) ||
         relativeToRoot === ".." ||
@@ -458,8 +464,7 @@ export async function GET(req: NextRequest) {
           version.number,
           format,
         );
-        const root = path.resolve(process.cwd());
-        const artifactDir = path.join(root, ".data", "generated", d.id);
+        const artifactDir = path.join(dataDirectory(), "generated", d.id);
         await mkdir(artifactDir, { recursive: true });
         const artifactPath = path.join(artifactDir, `${version.id}.${format}`);
         await writeFile(artifactPath, rendered.bytes);
@@ -486,7 +491,7 @@ export async function GET(req: NextRequest) {
         const artifacts =
           (sourceRecord.data.artifacts as Record<string, string> | undefined) ||
           {};
-        artifacts[format] = path.relative(root, artifactPath);
+        artifacts[format] = `@generated/${d.id}/${version.id}.${format}`;
         artifacts[`${format}Hash`] = createHash("sha256")
           .update(rendered.bytes)
           .digest("hex");
@@ -513,7 +518,9 @@ export async function GET(req: NextRequest) {
       response.cookies.set("singularity-session", token, {
         httpOnly: true,
         sameSite: "strict",
-        secure: process.env.SECURE_COOKIES === "true",
+        secure:
+          process.env.VERCEL === "1" ||
+          process.env.SECURE_COOKIES === "true",
         path: "/",
         maxAge: 86400,
       });

@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import type { Employee, RecordItem } from "./types";
@@ -9,9 +10,26 @@ export const timestamp = () => new Date().toISOString();
 export const digest = (s: string) =>
   createHash("sha256").update(s).digest("hex");
 let connection: Database.Database | undefined;
+export function dataDirectory() {
+  const isVercel = process.env.VERCEL === "1";
+  const configured = process.env.BRAHMA_DATA_DIR?.trim();
+  // Vercel's deployment directory is read-only. Ignore relative configured
+  // paths there so SQLite and generated files always use writable /tmp space.
+  if (isVercel) {
+    const temporaryRoot = process.env.TMPDIR || os.tmpdir();
+    const configuredPath = configured ? path.resolve(configured) : "";
+    const temporaryPath = path.resolve(temporaryRoot);
+    return configuredPath &&
+      (configuredPath === temporaryPath ||
+        configuredPath.startsWith(temporaryPath + path.sep))
+      ? configuredPath
+      : path.join(temporaryPath, "brahmagpt");
+  }
+  return path.resolve(configured || ".data");
+}
 export function db() {
   if (connection) return connection;
-  const dir = path.resolve(process.env.BRAHMA_DATA_DIR || ".data");
+  const dir = dataDirectory();
   fs.mkdirSync(dir, { recursive: true });
   const c = new Database(path.join(dir, "enterprise.sqlite"));
   c.exec(
@@ -49,6 +67,7 @@ export function db() {
   if (!c.prepare("SELECT id FROM employees LIMIT 1").get()) seed(c);
   const configuredDataDir = process.env.BRAHMA_DATA_DIR;
   const usesDefaultWorkspace =
+    process.env.VERCEL === "1" ||
     !configuredDataDir ||
     path.resolve(configuredDataDir) === path.resolve(".data");
   if (usesDefaultWorkspace) ensureOrganizationDirectory(c);

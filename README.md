@@ -20,6 +20,12 @@ Home and enterprise search share one Assistant workspace. Use the organization s
 
 The development launcher refuses duplicate servers and occupied ports, then clears only its generated development output before starting. Production output and your data are preserved. For ordinary use after a build, run `npm.cmd start`; use `npm.cmd run dev` when editing the code.
 
+## Run on Vercel
+
+Import this repository into Vercel and use the detected Next.js settings with the repository root as the Root Directory. The API routes run on Node.js. Set `GEMINI_API_KEY` in the Vercel project's server-side Environment Variables to enable Gemini; `GEMINI_MODEL` is optional. Do not set `BRAHMA_DATA_DIR` to `.data` or another path under `/var/task`.
+
+On Vercel, the app automatically places SQLite and generated exports under `/tmp/brahmagpt`, so the read-only deployment directory no longer prevents the workspace from opening. The bundled source index and sample citation files are included in the API routes. Vercel's `/tmp` is temporary: edits, approvals, chat history and generated files can disappear after a cold start or redeploy and are not shared reliably across function instances. Use a persistent database and object storage before using this deployment for shared or important data.
+
 ## Add your Gemini API key later
 
 Open `.env.local` in this project's root:
