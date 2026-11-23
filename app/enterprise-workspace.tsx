@@ -58,6 +58,7 @@ import WorkEngine from "./work-engine";
 import OrganizationDirectory from "./organization-directory";
 import ProjectWorkspace from "./project-workspace";
 import LoginPanel from "./login-panel";
+import { requestJson } from "./request-json";
 import type {
   Snapshot,
   RecordItem,
@@ -128,6 +129,40 @@ function Empty({ title, children }: { title: string; children?: ReactNode }) {
   );
 }
 
+function StartupScreen({
+  title,
+  message,
+  loading = false,
+  userName,
+  onRetry,
+  onSignOut,
+}: {
+  title: string;
+  message?: string;
+  loading?: boolean;
+  userName?: string;
+  onRetry?: () => void;
+  onSignOut?: () => void;
+}) {
+  return (
+    <main className="startup-screen">
+      <section className="startup-card" role={loading ? "status" : undefined} aria-live="polite">
+        <Mark small />
+        <h1>{title}</h1>
+        {userName && <p className="muted">Signed in as {userName}</p>}
+        {loading ? <Loader2 className="startup-spinner" aria-hidden="true" /> : null}
+        {message && <p className="startup-message" role="alert">{message}</p>}
+        {(onRetry || onSignOut) && (
+          <div className="startup-actions">
+            {onRetry && <button className="primary" onClick={onRetry}>Retry</button>}
+            {onSignOut && <button onClick={onSignOut}>Sign out</button>}
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
 export default function EnterpriseWorkspace() {
   const pathname = usePathname(),
     router = useRouter(),
@@ -136,8 +171,11 @@ export default function EnterpriseWorkspace() {
     section = parts[0] || "",
     selectedId = parts[1];
   const [data, setData] = useState<Snapshot>();
-  const [authState, setAuthState] = useState<"checking" | "signedIn" | "signedOut">("checking");
-  const [setupAvailable, setSetupAvailable] = useState(false);
+  const [authState, setAuthState] = useState<"checking" | "signedIn" | "signedOut" | "error">("checking");
+  const [sessionUser, setSessionUser] = useState<{ name: string }>();
+  const [authError, setAuthError] = useState("");
+  const [workspaceState, setWorkspaceState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [workspaceError, setWorkspaceError] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [searchActive, setSearchActive] = useState(
@@ -211,6 +249,8 @@ export default function EnterpriseWorkspace() {
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const landingPreferenceApplied = useRef(false);
   const searchSequence = useRef(0);
+  const sessionRequestVersion = useRef(0);
+  const workspaceRequestVersion = useRef(0);
   const currentDocument = data?.documents.find((d) => d.id === selectedId);
   const chat = data?.chats.find((c) => c.id === selectedId);
   const run = data?.workflows.find((r) => r.id === selectedId);
@@ -228,29 +268,59 @@ export default function EnterpriseWorkspace() {
       return true;
     })
     .sort((a, b) => b.created.localeCompare(a.created));
+  async function checkSession() {
+    const requestVersion = ++sessionRequestVersion.current;
+    setAuthState("checking");
+    setAuthError("");
+    try {
+      const { response, body } = await requestJson("/api/auth?session=1", {}, 12_000);
+      if (requestVersion !== sessionRequestVersion.current) return false;
+      if (response.status === 401 || (response.ok && body.authenticated === false)) {
+        setSessionUser(undefined);
+        setAuthState("signedOut");
+        return false;
+      }
+      if (!response.ok) {
+        const message = typeof body.error === "string" ? body.error : "Your sign-in could not be checked. Retry or sign out.";
+        throw new Error(typeof body.requestId === "string" ? `${message} Reference: ${body.requestId}` : message);
+      }
+      if (body.authenticated !== true) throw new Error("Your sign-in response was incomplete. Retry or sign out.");
+      setSessionUser(body.user as { name: string } | undefined);
+      setAuthState("signedIn");
+      setWorkspaceState(data ? "ready" : "idle");
+      return true;
+    } catch (e) {
+      if (requestVersion !== sessionRequestVersion.current) return false;
+      const message = e instanceof Error ? e.message : "Your sign-in could not be checked. Retry or sign out.";
+      setAuthError(message);
+      setAuthState("error");
+      throw e;
+    }
+  }
   async function refresh() {
-    const res = await fetch("/api/workspace", { cache: "no-store" });
-    const json = await res.json();
+    const requestVersion = ++workspaceRequestVersion.current;
+    const { response: res, body: json } = await requestJson("/api/workspace", {}, 20_000);
+    if (requestVersion !== workspaceRequestVersion.current) return json as Snapshot;
     if (!res.ok) {
       if (res.status === 401) {
         setAuthState("signedOut");
         setData(undefined);
       }
-      throw new Error(json.error);
+      const message = typeof json.error === "string" ? json.error : "Your workspace could not be loaded. Retry or sign out.";
+      throw new Error(typeof json.requestId === "string" ? `${message} Reference: ${json.requestId}` : message);
     }
-    setData(json);
+    setData(json as Snapshot);
     setAuthState("signedIn");
+    setSessionUser({ name: json.user.name });
+    setWorkspaceState("ready");
+    setWorkspaceError("");
     return json as Snapshot;
   }
   useEffect(() => {
-    refresh().catch((e) => {
-      setError(e.message);
-      if (e instanceof Error && e.message !== "Sign in required.") setAuthState("signedOut");
+    checkSession().catch((e) => {
+      setAuthError(e instanceof Error ? e.message : "Your sign-in could not be checked. Retry or sign out.");
+      setAuthState("error");
     });
-    fetch("/api/auth", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((result) => setSetupAvailable(Boolean(result.setupAvailable)))
-      .catch(() => undefined);
     try {
       setCollapsed(
         localStorage.getItem("singularity-sidebar-collapsed") === "true",
@@ -263,6 +333,20 @@ export default function EnterpriseWorkspace() {
       );
     } catch {}
   }, []);
+  useEffect(() => {
+    if (authState !== "signedIn" || data || workspaceState !== "idle") return;
+    let active = true;
+    setWorkspaceState("loading");
+    refresh().catch((e) => {
+      if (!active) return;
+      setWorkspaceError(e instanceof Error ? e.message : "Your workspace could not be loaded. Retry or sign out.");
+      setWorkspaceState("error");
+    });
+    return () => { active = false; };
+  }, [authState, data, workspaceState]);
+  useEffect(() => {
+    if (authState === "signedIn" && section === "profile") router.replace("/");
+  }, [authState, section, router]);
   useEffect(() => {
     if (landingPreferenceApplied.current) return;
     landingPreferenceApplied.current = true;
@@ -493,12 +577,11 @@ export default function EnterpriseWorkspace() {
     setBusy(true);
     setError("");
     try {
-      const res = await fetch("/api/workspace", {
+      const { response: res, body: json } = await requestJson("/api/workspace", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-      });
-      const json = await res.json();
+      }, 20_000);
       if (res.status === 401) setAuthState("signedOut");
       if (!res.ok) throw new Error(json.error);
       await refresh();
@@ -523,12 +606,16 @@ export default function EnterpriseWorkspace() {
     }
   }
   async function signOut() {
-    await fetch("/api/auth", {
+    sessionRequestVersion.current++;
+    workspaceRequestVersion.current++;
+    await requestJson("/api/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "logout" }),
-    }).catch(() => undefined);
+    }, 8_000).catch(() => undefined);
     setData(undefined);
+    setSessionUser(undefined);
+    setWorkspaceState("idle");
     setAuthState("signedOut");
     setProfileMenu(false);
     router.replace("/");
@@ -536,12 +623,11 @@ export default function EnterpriseWorkspace() {
   async function changeDemoRole(role: "admin" | "manager" | "employee") {
     setBusy(true);
     try {
-      const response = await fetch("/api/auth", {
+      const { response, body: result } = await requestJson("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "switchDemoRole", role }),
-      });
-      const result = await response.json();
+      }, 12_000);
       if (!response.ok) throw new Error(result.error);
       setProfileMenu(false);
       router.replace("/");
@@ -3057,20 +3143,48 @@ export default function EnterpriseWorkspace() {
       </div>
     );
   }
-  if (authState !== "signedIn" || !data) {
-    if (authState === "checking")
-      return <div className="loading">Checking your sign-in…</div>;
+  if (authState === "checking")
+    return <StartupScreen title="Checking your sign-in…" loading />;
+  if (authState === "error")
+    return (
+      <StartupScreen
+        title="We couldn’t check your sign-in"
+        message={authError}
+        onRetry={() => void checkSession().catch(() => undefined)}
+        onSignOut={() => void signOut()}
+      />
+    );
+  if (authState === "signedOut") {
     return (
       <LoginPanel
-        setupAvailable={setupAvailable}
+        setupAvailable={false}
         onLogin={async () => {
-          await refresh();
-          setError("");
-          router.replace("/");
+          setData(undefined);
+          setWorkspaceError("");
+          setWorkspaceState("idle");
+          if (!(await checkSession())) throw new Error("Sign-in succeeded, but the session could not be confirmed. Please sign in again.");
         }}
       />
     );
   }
+  if (!data)
+    return (
+      <StartupScreen
+        title={workspaceState === "error" ? "We couldn’t open your workspace" : "Opening your workspace…"}
+        message={workspaceState === "error" ? workspaceError : undefined}
+        loading={workspaceState !== "error"}
+        userName={sessionUser?.name}
+        onRetry={workspaceState === "error" ? () => {
+          setWorkspaceError("");
+          setWorkspaceState("loading");
+          refresh().catch((e) => {
+            setWorkspaceError(e instanceof Error ? e.message : "Your workspace could not be loaded. Retry or sign out.");
+            setWorkspaceState("error");
+          });
+        } : undefined}
+        onSignOut={() => void signOut()}
+      />
+    );
   return (
     <div
       className={

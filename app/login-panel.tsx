@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { Flower2 } from "lucide-react";
+import { requestJson } from "./request-json";
 
 type Props = { setupAvailable: boolean; onLogin: () => Promise<void> };
 export default function LoginPanel({ setupAvailable: initialSetup, onLogin }: Props) {
@@ -12,8 +13,11 @@ export default function LoginPanel({ setupAvailable: initialSetup, onLogin }: Pr
   const [message, setMessage] = useState("");
   const [serviceNote, setServiceNote] = useState("");
   useEffect(() => {
-    fetch("/api/auth", { cache: "no-store" }).then((response) => response.json())
-      .then((result) => {
+    requestJson("/api/auth?status=1", {}, 10_000).then(({ response, body: result }) => {
+        if (!response.ok) {
+          setServiceNote(typeof result.error === "string" ? result.error : "Login setup could not be checked. Retry shortly.");
+          return;
+        }
         setSetupAvailable(Boolean(result.setupAvailable));
         if (result.missingLoginConfiguration?.length) {
           setServiceNote(`Set these server environment variables to enable sign-in: ${result.missingLoginConfiguration.join(", ")}.`);
@@ -21,7 +25,7 @@ export default function LoginPanel({ setupAvailable: initialSetup, onLogin }: Pr
           setServiceNote(`First-admin setup still needs: ${result.missingSetupConfiguration.join(", ")}.`);
         } else if (result.message) setServiceNote(result.message);
       })
-      .catch(() => undefined);
+      .catch((error) => setServiceNote(error instanceof Error ? error.message : "Login setup could not be checked. Retry shortly."));
   }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -31,12 +35,11 @@ export default function LoginPanel({ setupAvailable: initialSetup, onLogin }: Pr
     const form = new FormData(event.currentTarget);
     const body = Object.fromEntries(form.entries());
     try {
-      const response = await fetch("/api/auth", {
+      const { response, body: result } = await requestJson("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...body, action: mode }),
-      });
-      const result = await response.json();
+      }, 20_000);
       if (!response.ok) throw new Error(result.error || "Could not sign in.");
       if (mode === "setup") {
         setSetupAvailable(false);

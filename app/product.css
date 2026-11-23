@@ -3932,3 +3932,26 @@ select {
   color: #5146d8;
   font-size: 11px;
 }
+.startup-screen {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg);
+}
+.startup-card {
+  width: min(100%, 440px);
+  padding: 32px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, .08);
+  text-align: center;
+}
+.startup-card .brand-mark { margin: 0 auto 14px; }
+.startup-card h1 { margin: 0; font-size: 22px; }
+.startup-message { margin: 14px 0; color: var(--danger, #b42318); font-size: 13px; line-height: 1.5; }
+.startup-spinner { margin: 18px auto 0; animation: startup-spin 1s linear infinite; color: var(--sidebar-accent, #5445ed); }
+.startup-actions { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
+.startup-actions button { min-width: 110px; }
+@keyframes startup-spin { to { transform: rotate(360deg); } }

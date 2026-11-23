@@ -24,6 +24,14 @@ type SessionRow = {
   active_role: DemoRole;
   expires_at: Date;
 };
+export type VerifiedSession = {
+  userId: string;
+  name: string;
+  email: string;
+  role: DemoRole;
+  demoAdmin: boolean;
+  workspaceId: string;
+};
 
 let sqlClient: Sql | undefined;
 let schemaReady: Promise<void> | undefined;
@@ -31,16 +39,25 @@ function getSql() {
   const url = process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL;
   if (!url) throw new Error("Supabase PostgreSQL is not configured.");
   return (sqlClient ||= postgres(url, {
-    max: 3,
+    max: 1,
     prepare: false,
-    connect_timeout: 8,
-    idle_timeout: 20,
+    connect_timeout: 5,
+    idle_timeout: 10,
+    max_lifetime: 60,
+    queue_timeout: 4,
+    query_timeout: 8,
+    cancel_timeout: 2,
   }));
 }
 async function ensureSchema() {
   if (!schemaReady) {
     schemaReady = (async () => {
       const sql = getSql();
+      const existing = await sql<{ profiles: string | null; sessions: string | null; setup: string | null }[]>`
+        SELECT to_regclass('public.brahma_auth_profiles')::text AS profiles,
+          to_regclass('public.brahma_auth_sessions')::text AS sessions,
+          to_regclass('public.brahma_auth_setup')::text AS setup`;
+      if (existing[0]?.profiles && existing[0]?.sessions && existing[0]?.setup) return;
       await sql`CREATE TABLE IF NOT EXISTS public.brahma_auth_profiles (
         user_id uuid PRIMARY KEY,
         email text NOT NULL UNIQUE,
@@ -125,8 +142,10 @@ function tokenHash(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 async function authRequest(path: string, key: string, init?: RequestInit) {
+  const timeoutSignal = AbortSignal.timeout(8_000);
   return fetch(`${supabaseUrl()}/auth/v1/${path}`, {
     ...init,
+    signal: init?.signal || timeoutSignal,
     cache: "no-store",
     headers: {
       apikey: key,
@@ -140,11 +159,15 @@ async function parseAuthError(response: Response) {
     msg?: string;
     message?: string;
     error_description?: string;
+    error?: string;
   };
-  const raw = result.msg || result.message || result.error_description || "";
   if (response.status === 400 || response.status === 401)
     return new Error("Email or password is incorrect.");
-  console.error("[BrahmaGPT Auth] Supabase Auth request failed", response.status, raw.slice(0, 300));
+  console.info(JSON.stringify({
+    event: "supabase_auth_failure",
+    status: response.status,
+    errorCode: (result.error || "upstream_error").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40),
+  }));
   return new Error("Sign in is temporarily unavailable. Please try again later.");
 }
 export async function authStatus() {
@@ -203,7 +226,12 @@ export async function authStatus() {
       ...flags,
     };
   } catch (error) {
-    console.error("[BrahmaGPT Auth] Supabase login storage check failed", error);
+    const code = (error as { code?: unknown })?.code;
+    console.info(JSON.stringify({
+      event: "auth_storage_check_failed",
+      errorType: error instanceof Error ? error.name : "Error",
+      ...(typeof code === "string" && /^[A-Z0-9_]{1,40}$/.test(code) ? { errorCode: code } : {}),
+    }));
     return {
       configured: false,
       setupAvailable: false,
@@ -315,13 +343,11 @@ export function clearSessionCookie(response: NextResponse) {
 }
 export async function logout(token: string | undefined) {
   if (!token) return;
-  await ensureSchema();
   await getSql()`DELETE FROM public.brahma_auth_sessions WHERE token_hash=${tokenHash(token)}`;
 }
-export async function identity(req: NextRequest): Promise<Employee | undefined> {
+export async function verifySession(req: NextRequest): Promise<VerifiedSession | undefined> {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   if (!token) return;
-  await ensureSchema();
   const sql = getSql();
   const hash = tokenHash(token);
   const rows = await sql<{
@@ -390,24 +416,35 @@ export async function identity(req: NextRequest): Promise<Employee | undefined> 
     await sql`DELETE FROM public.brahma_auth_sessions WHERE token_hash=${hash}`;
     return;
   }
-  if (row.workspace_id === "demo-default") {
-    const sampleId = row.active_role === "admin" ? "sam" : row.active_role === "manager" ? "maya" : "noah";
-    const sample = db().prepare("SELECT * FROM employees WHERE id=?").get(sampleId) as Employee | undefined;
-    if (!sample) return;
-    return {
-      ...sample,
-      role: row.active_role,
-      name: row.display_name,
-      email: row.email,
-      demoAdmin: row.demo_admin,
-      demoRole: row.active_role,
-    };
-  }
-  return;
+  return {
+    userId: row.user_id,
+    name: row.display_name,
+    email: row.email,
+    role: row.active_role,
+    demoAdmin: row.demo_admin,
+    workspaceId: row.workspace_id,
+  };
+}
+export async function identity(req: NextRequest): Promise<Employee | undefined> {
+  const session = await verifySession(req);
+  return session ? workspaceIdentity(session) : undefined;
+}
+export function workspaceIdentity(session: VerifiedSession): Employee | undefined {
+  if (!session || session.workspaceId !== "demo-default") return;
+  const sampleId = session.role === "admin" ? "sam" : session.role === "manager" ? "maya" : "noah";
+  const sample = db().prepare("SELECT * FROM employees WHERE id=?").get(sampleId) as Employee | undefined;
+  if (!sample) return;
+  return {
+    ...sample,
+    role: session.role,
+    name: session.name,
+    email: session.email,
+    demoAdmin: session.demoAdmin,
+    demoRole: session.role,
+  };
 }
 export async function switchDemoRole(token: string | undefined, role: DemoRole) {
   if (!token) throw new Error("Sign in first.");
-  await ensureSchema();
   const sql = getSql();
   const profile = await sql<{ demo_admin: boolean; workspace_id: string }[]>`
     SELECT p.demo_admin,p.workspace_id FROM public.brahma_auth_sessions s

@@ -15,7 +15,10 @@ import {
 import {
   identity,
   requireWorkspaceWriteAccess,
+  verifySession,
+  workspaceIdentity,
 } from "@/lib/enterprise/auth";
+import { logApiRequest, requestId } from "@/lib/enterprise/api-observability";
 import {
   employee,
   snapshot,
@@ -176,9 +179,9 @@ function failure(e: unknown) {
       error:
         e instanceof z.ZodError
           ? e.issues.map((i) => i.message).join("; ")
-          : e instanceof Error
+          : e instanceof WorkspaceError
             ? e.message
-            : "Request failed",
+            : "The request could not be completed. Retry the operation.",
     },
     {
       status:
@@ -349,9 +352,18 @@ async function retryApprovalSubmission(
   }
 }
 export async function GET(req: NextRequest) {
+  const id = requestId(req);
+  const startedAt = Date.now();
+  let stage = "session_verification";
   try {
-    const u = await identity(req);
-    if (!u) throw new WorkspaceError("Sign in required.", 401);
+    const session = await verifySession(req);
+    if (!session) {
+      logApiRequest({ route: "/api/workspace", requestId: id, stage, startedAt, status: 401 });
+      return NextResponse.json({ error: "Sign in required.", requestId: id }, { status: 401, headers: { "Cache-Control": "no-store" } });
+    }
+    stage = "sqlite_identity_lookup";
+    const u = workspaceIdentity(session);
+    if (!u) throw new WorkspaceError("Workspace profile unavailable. Retry or sign out.", 503);
     const url = req.nextUrl;
     let response: NextResponse;
     if (url.searchParams.has("source")) {
@@ -501,10 +513,20 @@ export async function GET(req: NextRequest) {
           },
         });
       } else response = NextResponse.json(d);
-    } else response = NextResponse.json(snapshot(u));
+    } else {
+      stage = "workspace_snapshot";
+      response = NextResponse.json(snapshot(u), { headers: { "Cache-Control": "private, no-store" } });
+    }
+    logApiRequest({ route: "/api/workspace", requestId: id, stage, startedAt, status: 200 });
     return response;
   } catch (e) {
-    return failure(e);
+    const status = e instanceof WorkspaceError ? e.status : e instanceof z.ZodError ? 400 : 503;
+    logApiRequest({ route: "/api/workspace", requestId: id, stage, startedAt, status, error: e });
+    if (e instanceof WorkspaceError || e instanceof z.ZodError) return failure(e);
+    return NextResponse.json({
+      error: "Your workspace could not be loaded. Retry or sign out and sign in again.",
+      requestId: id,
+    }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 }
 export async function POST(req: NextRequest) {
