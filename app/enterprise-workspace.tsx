@@ -48,6 +48,7 @@ import {
   Copy,
   CircleHelp,
   SquarePen,
+  Database,
 } from "lucide-react";
 import { useTheme } from "./theme-provider";
 import WorkspaceHome from "./workspace-home";
@@ -145,6 +146,14 @@ export default function EnterpriseWorkspace() {
   const [approvalFilter, setApprovalFilter] = useState("Pending");
   const [profileMenu, setProfileMenu] = useState(false);
   const [settingsTab, setSettingsTab] = useState("General");
+  const [supabaseStatus, setSupabaseStatus] = useState<{
+    configured: boolean;
+    connected: boolean;
+    connectionVariable: string | null;
+    supabaseApiConfigured: boolean;
+    message: string;
+  }>();
+  const [supabaseBusy, setSupabaseBusy] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationBadgeEnabled, setNotificationBadgeEnabled] =
     useState(true);
@@ -2709,29 +2718,36 @@ export default function EnterpriseWorkspace() {
           <h1>Settings</h1>
           <div className="settings-layout">
             <nav className="settings-nav" aria-label="Settings sections">
-              {["General", "Appearance", "Usage", "Gemini", "Activity"].map(
-                (tab) => (
-                  <button
-                    key={tab}
-                    className={settingsTab === tab ? "active" : ""}
-                    aria-current={settingsTab === tab ? "page" : undefined}
-                    onClick={() => setSettingsTab(tab)}
-                  >
-                    {tab === "Appearance" ? (
-                      <Sun size={16} />
-                    ) : tab === "Usage" ? (
-                      <Briefcase size={16} />
-                    ) : tab === "Gemini" ? (
-                      <CircleHelp size={16} />
-                    ) : tab === "Activity" ? (
-                      <History size={16} />
-                    ) : (
-                      <Settings size={16} />
-                    )}
-                    {tab}
-                  </button>
-                ),
-              )}
+              {[
+                "General",
+                "Appearance",
+                "Usage",
+                "Gemini",
+                "Supabase",
+                "Activity",
+              ].map((tab) => (
+                <button
+                  key={tab}
+                  className={settingsTab === tab ? "active" : ""}
+                  aria-current={settingsTab === tab ? "page" : undefined}
+                  onClick={() => setSettingsTab(tab)}
+                >
+                  {tab === "Appearance" ? (
+                    <Sun size={16} />
+                  ) : tab === "Usage" ? (
+                    <Briefcase size={16} />
+                  ) : tab === "Gemini" ? (
+                    <CircleHelp size={16} />
+                  ) : tab === "Supabase" ? (
+                    <Database size={16} />
+                  ) : tab === "Activity" ? (
+                    <History size={16} />
+                  ) : (
+                    <Settings size={16} />
+                  )}
+                  {tab}
+                </button>
+              ))}
             </nav>
             <div className="settings-content">
               {settingsTab === "Appearance" && (
@@ -2955,6 +2971,69 @@ export default function EnterpriseWorkspace() {
                     Without a key, local search, predefined workflows,
                     documents, and authorized approvals work in offline local
                     mode.
+                  </p>
+                </section>
+              )}
+              {settingsTab === "Supabase" && (
+                <section>
+                  <div className="section-heading">
+                    <h3>Supabase connection</h3>
+                    {supabaseStatus && (
+                      <Status>
+                        {supabaseStatus.connected
+                          ? "Connected"
+                          : supabaseStatus.configured
+                            ? "Connection failed"
+                            : "Not configured"}
+                      </Status>
+                    )}
+                  </div>
+                  <p className="muted">
+                    Check the Vercel PostgreSQL connection without showing
+                    credentials in the browser.
+                  </p>
+                  <button
+                    disabled={supabaseBusy}
+                    onClick={async () => {
+                      setSupabaseBusy(true);
+                      try {
+                        const response = await fetch("/api/supabase/status", {
+                          cache: "no-store",
+                        });
+                        setSupabaseStatus(await response.json());
+                      } catch {
+                        setSupabaseStatus({
+                          configured: false,
+                          connected: false,
+                          connectionVariable: null,
+                          supabaseApiConfigured: false,
+                          message: "The connection check could not run.",
+                        });
+                      } finally {
+                        setSupabaseBusy(false);
+                      }
+                    }}
+                  >
+                    {supabaseBusy ? "Checking..." : "Check connection"}
+                  </button>
+                  {supabaseStatus && (
+                    <p role="status" className="muted">
+                      {supabaseStatus.message}
+                      {supabaseStatus.connectionVariable && (
+                        <>
+                          {" "}
+                          Connected using{" "}
+                          <code>{supabaseStatus.connectionVariable}</code>.
+                        </>
+                      )}
+                    </p>
+                  )}
+                  <p className="inline-note">
+                    This checks PostgreSQL only. Workspace records still use
+                    SQLite until the data migration is completed and verified.
+                  </p>
+                  <p className="muted">
+                    See <code>docs/SUPABASE_SETUP.md</code> for setup steps.
                   </p>
                 </section>
               )}
