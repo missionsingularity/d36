@@ -43,7 +43,7 @@ export function importCsv(u: Employee, input: unknown) {
     throw new WorkspaceError("Administrator required", 403);
   const v = z
     .object({
-      kind: z.enum(["Assets", "Projects", "Employees"]),
+      kind: z.enum(["Assets", "Projects", "Employees", "Tasks"]),
       csv: z.string(),
       mapping: z.record(z.string(), z.string()),
       confirm: z.boolean().default(false),
@@ -60,6 +60,9 @@ export function importCsv(u: Employee, input: unknown) {
       body: get("body"),
       department: get("department") || "Operations",
       email: get("email"),
+      owner: get("owner") || u.id,
+      project: get("project"),
+      members: get("members"),
     };
   });
   const seen = new Set<string>();
@@ -81,6 +84,32 @@ export function importCsv(u: Employee, input: unknown) {
         normalized.filter((x) => x.email === r.email).length > 1)
     )
       errors.push(`Row ${r.row}: valid unique email required`);
+    if (
+      v.kind === "Tasks" &&
+      !db().prepare("SELECT id FROM employees WHERE id=?").get(r.owner)
+    )
+      errors.push(`Row ${r.row}: assigned employee ${r.owner} was not found`);
+    if (
+      v.kind === "Tasks" &&
+      (!r.project ||
+        !db()
+          .prepare("SELECT id FROM records WHERE id=? AND type='Projects'")
+          .get(r.project))
+    )
+      errors.push(
+        `Row ${r.row}: project ${r.project || "(missing)"} was not found`,
+      );
+    if (
+      v.kind === "Projects" &&
+      r.members &&
+      r.members
+        .split(/[;|]/)
+        .map((id) => id.trim())
+        .some(
+          (id) => !db().prepare("SELECT id FROM employees WHERE id=?").get(id),
+        )
+    )
+      errors.push(`Row ${r.row}: one or more project members were not found`);
   }
   const preview = { rows: normalized, errors, count: normalized.length };
   if (!v.confirm) return preview;
@@ -99,20 +128,44 @@ export function importCsv(u: Employee, input: unknown) {
             ? "IT"
             : v.kind === "Employees"
               ? "People"
-              : "Projects",
+              : v.kind === "Tasks"
+                ? "Tasks"
+                : "Projects",
         title: r.title,
         body: r.body || r.title,
         department: v.kind === "Employees" ? "Company" : r.department,
-        owner: u.id,
-        status: "Active",
+        owner: v.kind === "Tasks" ? r.owner : u.id,
+        project: v.kind === "Tasks" ? r.project : undefined,
+        status: v.kind === "Tasks" ? "Open" : "Active",
         updated: timestamp(),
         data:
           v.kind === "Assets"
             ? { category: "Asset", ageYears: 0, failures: 0 }
             : v.kind === "Projects"
-              ? { members: [u.id] }
-              : {},
+              ? {
+                  members: r.members
+                    ? r.members.split(/[;|]/).map((id) => id.trim())
+                    : [u.id],
+                }
+              : v.kind === "Tasks"
+                ? { imported: true }
+                : {},
       });
+      if (v.kind === "Tasks" && r.project)
+        db()
+          .prepare(
+            "INSERT OR IGNORE INTO relationships(id,fromId,relation,toId) VALUES(?,?,?,?)",
+          )
+          .run(uid(), r.id, "PART_OF", r.project);
+      if (v.kind === "Projects")
+        for (const member of r.members
+          ? r.members.split(/[;|]/).map((id) => id.trim())
+          : [u.id])
+          db()
+            .prepare(
+              "INSERT OR IGNORE INTO relationships(id,fromId,relation,toId) VALUES(?,?,?,?)",
+            )
+            .run(uid(), r.id, "HAS_MEMBER", member);
     }
     const id = uid();
     const receipt = {

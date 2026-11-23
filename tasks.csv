@@ -1,0 +1,26 @@
+﻿task_id,project_id,title,owner,status,due_date
+ALP-101,ALP,Source citation viewer,Priya Das,In progress,2026-11-27
+ALP-102,ALP,Document export and versioning,Rahul Bora,Review,2026-11-25
+ALP-103,ALP,Project role access tests,Meera Dutta,In progress,2026-11-30
+ALP-104,ALP,Reviewer approval states,Aarav Sharma,Review,2026-12-02
+ALP-105,ALP,Legacy CSV import mapping,Kabir Ali,To do,2026-12-05
+BET-101,BET,Review client requirements,Neha Roy,Done,2026-10-16
+BET-102,BET,Responsive layout implementation,Priya Das,In progress,2026-11-30
+BET-103,BET,Accessibility checks,Kabir Ali,To do,2026-12-02
+BET-104,BET,Client design approval,Riya Sen,Review,2026-11-25
+BET-105,BET,Content migration handover,Rahul Bora,Blocked,2026-12-04
+GAM-101,GAM,Map employee records,Meera Dutta,Done,2026-10-12
+GAM-102,GAM,Build onboarding flow,Rahul Bora,In progress,2026-11-30
+GAM-103,GAM,Manager approval routing,Aarav Sharma,Review,2026-12-04
+GAM-104,GAM,Access matrix test,Kabir Ali,To do,2026-12-15
+GAM-105,GAM,Draft employee help guide,Neha Roy,To do,2026-12-20
+DEL-101,DEL,Inventory staging services,Rahul Bora,Done,2026-10-28
+DEL-102,DEL,Verify database backup restore,Kabir Ali,Done,2026-11-21
+DEL-103,DEL,Prepare change request,Aarav Sharma,Review,2026-12-04
+DEL-104,DEL,Security assessment,Meera Dutta,In progress,2026-12-02
+DEL-105,DEL,Execute approved migration,Priya Das,Blocked,2026-12-20
+EPS-101,EPS,Classify recurring tickets,Kabir Ali,Done,2026-11-04
+EPS-102,EPS,Implement escalation rules,Meera Dutta,In progress,2026-11-25
+EPS-103,EPS,Draft customer response templates,Neha Roy,Review,2026-12-01
+EPS-104,EPS,Build service target dashboard,Priya Das,To do,2026-12-12
+EPS-105,EPS,Prepare monthly support report,Riya Sen,To do,2026-12-30

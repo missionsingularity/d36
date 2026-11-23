@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { db, uid, log } from "@/lib/enterprise/db";
+import { createHash } from "node:crypto";
+import { readFile, mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import {
+  db,
+  uid,
+  log,
+  insertRecord,
+  timestamp,
+  atomic,
+} from "@/lib/enterprise/db";
 import {
   employee,
   snapshot,
@@ -13,13 +23,148 @@ import {
   requestLeave,
   createProject,
   updateTask,
+  updateITRecord,
+  createITIncident,
   document,
+  getRecord,
   WorkspaceError,
 } from "@/lib/enterprise/service";
 import { runChat } from "@/lib/enterprise/planner";
+import type { Workflow } from "@/lib/enterprise/types";
 import { importCsv } from "@/lib/enterprise/import";
+import { testGeminiConnection } from "@/lib/enterprise/planner";
+import {
+  control as controlWork,
+  runDetail,
+  tick as tickWork,
+} from "@/lib/enterprise/work-engine";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+async function renderDocument(
+  title: string,
+  content: string,
+  version: number,
+  format: string,
+) {
+  if (format === "docx") {
+    const { Document, Packer, Paragraph, HeadingLevel } = await import("docx");
+    const file = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({ text: title, heading: HeadingLevel.TITLE }),
+            new Paragraph(`Version ${version}`),
+            ...content.split("\n").map((line) => new Paragraph(line)),
+          ],
+        },
+      ],
+    });
+    return {
+      bytes: Buffer.from(await Packer.toBuffer(file)),
+      mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    };
+  }
+  if (format === "pdf") {
+    const { PDFDocument, StandardFonts } = await import("pdf-lib");
+    const pdf = await PDFDocument.create();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    let page = pdf.addPage();
+    let y = 790;
+    for (const line of `${title}\n\nVersion ${version}\n\n${content}`.split(
+      "\n",
+    )) {
+      const words = line.replace(/[^\x20-\x7E]/g, " ").split(" ");
+      let out = "";
+      for (const word of words) {
+        if (font.widthOfTextAtSize(out + word, 11) > 490 && out) {
+          if (y < 45) {
+            page = pdf.addPage();
+            y = 790;
+          }
+          page.drawText(out, { x: 50, y, size: 11, font });
+          y -= 17;
+          out = "";
+        }
+        out += word + " ";
+      }
+      if (y < 45) {
+        page = pdf.addPage();
+        y = 790;
+      }
+      page.drawText(out, { x: 50, y, size: 11, font });
+      y -= 17;
+    }
+    return { bytes: Buffer.from(await pdf.save()), mime: "application/pdf" };
+  }
+  if (format === "xlsx") {
+    const ExcelJS = (await import("exceljs")).default;
+    const book = new ExcelJS.Workbook();
+    const sheet = book.addWorksheet("Document");
+    sheet.columns = [
+      { header: "Section", key: "section", width: 28 },
+      { header: "Content", key: "content", width: 100 },
+    ];
+    sheet.addRow({ section: title, content: `Version ${version}` });
+    content
+      .split("\n")
+      .forEach((line, i) =>
+        sheet.addRow({ section: `Line ${i + 1}`, content: line }),
+      );
+    sheet.getRow(1).font = { bold: true };
+    sheet.eachRow((row) => {
+      row.alignment = { wrapText: true, vertical: "top" };
+    });
+    return {
+      bytes: Buffer.from(await book.xlsx.writeBuffer()),
+      mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    };
+  }
+  if (format === "pptx") {
+    const PptxGenJS = (await import("pptxgenjs")).default;
+    const deck = new PptxGenJS();
+    deck.layout = "LAYOUT_WIDE";
+    const lines = content.split("\n").filter(Boolean);
+    const groups: string[][] = [];
+    for (let i = 0; i < Math.max(lines.length, 1); i += 7)
+      groups.push(lines.slice(i, i + 7));
+    groups.forEach((group, i) => {
+      const slide = deck.addSlide();
+      slide.addText(title, {
+        x: 0.6,
+        y: 0.35,
+        w: 11.8,
+        h: 0.55,
+        fontSize: 24,
+        bold: true,
+        color: "312E81",
+      });
+      slide.addText(`Version ${version}${i ? ` · ${i + 1}` : ""}`, {
+        x: 0.6,
+        y: 1,
+        w: 11.8,
+        h: 0.35,
+        fontSize: 12,
+        color: "64748B",
+      });
+      slide.addText(group.join("\n") || "No content", {
+        x: 0.8,
+        y: 1.6,
+        w: 11.4,
+        h: 4.8,
+        fontSize: 18,
+        fit: "shrink",
+        color: "172033",
+      });
+    });
+    return {
+      bytes: Buffer.from(
+        (await deck.write({ outputType: "nodebuffer" })) as Buffer,
+      ),
+      mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    };
+  }
+  throw new WorkspaceError("Unsupported document format", 400);
+}
 function identity(req: NextRequest) {
   const token = req.cookies.get("singularity-session")?.value;
   const session = token
@@ -49,6 +194,164 @@ function failure(e: unknown) {
     },
   );
 }
+async function retryApprovalSubmission(
+  u: ReturnType<typeof employee>,
+  id: string,
+) {
+  const genericMessage =
+    "Your report draft was saved, but the approval request could not be created. You can retry the approval submission.";
+  const workflow = db()
+    .prepare("SELECT owner,status,documentId,events FROM workflows WHERE id=?")
+    .get(id) as
+    | {
+        owner: string;
+        status: string;
+        documentId: string | null;
+        events: string;
+      }
+    | undefined;
+  if (!workflow || workflow.owner !== u.id || !workflow.documentId)
+    throw new WorkspaceError("Workflow unavailable", 404);
+  const savedDocument = document(u, workflow.documentId);
+  const latest = savedDocument.versions.at(-1)!;
+  const existing = db()
+    .prepare("SELECT id,status,reviewerId FROM approvals WHERE versionId=?")
+    .get(latest.id) as
+    { id: string; status: string; reviewerId: string | null } | undefined;
+  if (existing) {
+    if (existing.status !== "PENDING_APPROVAL")
+      throw new WorkspaceError(
+        "This draft version already has a decision",
+        409,
+      );
+    const reviewer = existing.reviewerId
+      ? employee(existing.reviewerId).name
+      : "the assigned reviewer";
+    return {
+      approvalId: existing.id,
+      status: existing.status,
+      reviewer,
+      documentId: workflow.documentId,
+    };
+  }
+  if (workflow.status !== "Failed")
+    throw new WorkspaceError(
+      "This workflow is not waiting to retry approval",
+      409,
+    );
+  try {
+    const run = runDetail(u, id);
+    const submitStep = run.steps.find(
+      (step) =>
+        step.spec.tool === "submit_approval" && step.status === "QUEUED",
+    );
+    const draftStep = run.steps.find(
+      (step) =>
+        step.spec.tool === "create_document_draft" &&
+        (step.output as { id?: string } | null)?.id === workflow.documentId,
+    );
+    if (!submitStep || !draftStep || run.status !== "FAILED")
+      throw new WorkspaceError(
+        "Only the failed approval step can be retried",
+        409,
+      );
+    if (savedDocument.owner !== u.id || savedDocument.status !== "DRAFT")
+      throw new WorkspaceError(
+        "The saved draft is no longer available to submit",
+        409,
+      );
+
+    // Link this existing report to the project already calculated by the completed run.
+    if (!savedDocument.target) {
+      const progress = run.steps.find(
+        (step) =>
+          step.spec.tool === "calculate_project_progress" && step.output,
+      )?.output as { project?: { id?: string; type?: string } } | undefined;
+      const projectId = progress?.project?.id;
+      if (projectId && progress?.project?.type === "Projects") {
+        db()
+          .prepare(
+            "UPDATE documents SET target=? WHERE id=? AND status='DRAFT'",
+          )
+          .run(projectId, workflow.documentId);
+        db()
+          .prepare("UPDATE records SET project=?,updated=? WHERE id=?")
+          .run(projectId, timestamp(), `doc-${workflow.documentId}`);
+        db()
+          .prepare(
+            "INSERT OR IGNORE INTO relationships(id,fromId,relation,toId) VALUES(?,?,?,?)",
+          )
+          .run(uid(), workflow.documentId, "REFERENCES", projectId);
+      }
+    }
+    controlWork(u, id, "retry");
+    await tickWork(id);
+    const resumed = runDetail(u, id);
+    const approvalStep = resumed.steps.find(
+      (step) => step.spec.tool === "submit_approval",
+    );
+    const approvalId = approvalStep?.output;
+    const approval =
+      typeof approvalId === "string"
+        ? (db()
+            .prepare(
+              "SELECT id,status,documentId,versionId,reviewerId FROM approvals WHERE id=?",
+            )
+            .get(approvalId) as
+            | {
+                id: string;
+                status: string;
+                documentId: string;
+                versionId: string;
+                reviewerId: string | null;
+              }
+            | undefined)
+        : undefined;
+    if (
+      !approval ||
+      approval.status !== "PENDING_APPROVAL" ||
+      approval.documentId !== workflow.documentId ||
+      approval.versionId !== latest.id
+    )
+      throw new Error(
+        resumed.error || "Approval request did not pass verification",
+      );
+    const reviewer = approval.reviewerId
+      ? employee(approval.reviewerId).name
+      : "the assigned reviewer";
+    const text = `Approval ${approval.id} is pending with ${reviewer}. Your saved draft remains in Documents for review.`;
+    const events = JSON.parse(workflow.events) as Workflow["events"];
+    events.push({
+      tool: "submit_approval",
+      status: "completed",
+      detail: `Approval ${approval.id} created for ${latest.id}; assigned to ${reviewer}.`,
+      at: timestamp(),
+    });
+    atomic(() => {
+      db()
+        .prepare(
+          "UPDATE workflows SET status='Pending approval',events=? WHERE id=? AND owner=?",
+        )
+        .run(JSON.stringify(events), id, u.id);
+      db()
+        .prepare(
+          "UPDATE messages SET text=? WHERE runId=? AND role='assistant'",
+        )
+        .run(text, id);
+    });
+    return {
+      approvalId: approval.id,
+      status: approval.status,
+      reviewer,
+      documentId: workflow.documentId,
+    };
+  } catch (error) {
+    console.error("[BrahmaGPT] Approval retry failed", id, error);
+    if (error instanceof WorkspaceError && [403, 404].includes(error.status))
+      throw error;
+    throw new WorkspaceError(genericMessage, 409);
+  }
+}
 export async function GET(req: NextRequest) {
   try {
     let u = identity(req);
@@ -62,7 +365,73 @@ export async function GET(req: NextRequest) {
     }
     const url = req.nextUrl;
     let response: NextResponse;
-    if (url.searchParams.has("q"))
+    if (url.searchParams.has("source")) {
+      const sourceRecord = getRecord(u, url.searchParams.get("source")!);
+      if (sourceRecord.type !== "Documents")
+        throw new WorkspaceError("Source file unavailable", 404);
+      const rendition = url.searchParams.get("rendition") || "docx";
+      const artifacts = sourceRecord.data.artifacts as
+        Record<string, string> | undefined;
+      const relativePath =
+        rendition === "pdf"
+          ? artifacts?.pdf || sourceRecord.data.pdfFile
+          : rendition === "docx"
+            ? artifacts?.docx || sourceRecord.data.sourceFile
+            : rendition === "xlsx" || rendition === "pptx"
+              ? artifacts?.[rendition]
+              : undefined;
+      const expectedHash =
+        rendition === "pdf"
+          ? artifacts?.pdfHash || sourceRecord.data.pdfHash
+          : rendition === "docx"
+            ? artifacts?.docxHash || sourceRecord.data.sourceHash
+            : artifacts?.[`${rendition}Hash`];
+      if (
+        typeof relativePath !== "string" ||
+        !relativePath ||
+        typeof expectedHash !== "string"
+      )
+        throw new WorkspaceError("That source file is not available", 404);
+      const root = path.resolve(process.cwd());
+      const absolutePath = path.resolve(root, relativePath);
+      const relativeToRoot = path.relative(root, absolutePath);
+      if (
+        path.isAbsolute(relativeToRoot) ||
+        relativeToRoot === ".." ||
+        relativeToRoot.startsWith(".." + path.sep)
+      )
+        throw new WorkspaceError("Source path is outside the workspace", 403);
+      let sourceBytes: Buffer;
+      try {
+        sourceBytes = await readFile(absolutePath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT")
+          throw new WorkspaceError("Source file is no longer available", 404);
+        throw error;
+      }
+      const actualHash = createHash("sha256").update(sourceBytes).digest("hex");
+      if (actualHash !== expectedHash)
+        throw new WorkspaceError(
+          "Source file changed after indexing. Re-index it before citing.",
+          409,
+        );
+      const fileName = path.basename(absolutePath);
+      const isPdf = rendition === "pdf";
+      response = new NextResponse(new Uint8Array(sourceBytes), {
+        headers: {
+          "Content-Type": isPdf
+            ? "application/pdf"
+            : rendition === "xlsx"
+              ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              : rendition === "pptx"
+                ? "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "Content-Disposition": `${isPdf ? "inline" : "attachment"}; filename="${fileName}"`,
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    } else if (url.searchParams.has("q"))
       response = NextResponse.json({
         results: search(
           u,
@@ -82,77 +451,60 @@ export async function GET(req: NextRequest) {
         d.versions.find((v) => v.id === url.searchParams.get("version")) ||
         d.versions.at(-1)!;
       const format = url.searchParams.get("format");
-      if (format === "docx") {
-        const { Document, Packer, Paragraph, HeadingLevel } =
-          await import("docx");
-        const file = new Document({
-          sections: [
-            {
-              children: [
-                new Paragraph({
-                  text: version.title,
-                  heading: HeadingLevel.TITLE,
-                }),
-                ...version.content
-                  .split("\n")
-                  .map((text) => new Paragraph(text)),
-              ],
-            },
-          ],
-        });
-        response = new NextResponse(
-          new Uint8Array(await Packer.toBuffer(file)),
-          {
-            headers: {
-              "Content-Type":
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-              "Content-Disposition":
-                'attachment; filename="singularity-document.docx"',
-            },
-          },
+      if (format && ["docx", "pdf", "xlsx", "pptx"].includes(format)) {
+        const rendered = await renderDocument(
+          version.title,
+          version.content,
+          version.number,
+          format,
         );
-      } else if (format === "pdf") {
-        const { PDFDocument, StandardFonts } = await import("pdf-lib");
-        const pdf = await PDFDocument.create();
-        const font = await pdf.embedFont(StandardFonts.Helvetica);
-        let page = pdf.addPage(),
-          y = 790;
-        for (const line of (
-          version.title +
-          "\n\nv" +
-          version.number +
-          " · " +
-          version.created +
-          "\n\n" +
-          version.content
-        ).split("\n")) {
-          const safe = line.replace(/[^\x20-\x7E]/g, " ");
-          const words = safe.split(" ");
-          let output = "";
-          for (const word of words) {
-            if (font.widthOfTextAtSize(output + word, 11) > 490 && output) {
-              if (y < 45) {
-                page = pdf.addPage();
-                y = 790;
-              }
-              page.drawText(output, { x: 50, y, size: 11, font });
-              y -= 17;
-              output = "";
-            }
-            output += word + " ";
-          }
-          if (y < 45) {
-            page = pdf.addPage();
-            y = 790;
-          }
-          page.drawText(output, { x: 50, y, size: 11, font });
-          y -= 17;
+        const root = path.resolve(process.cwd());
+        const artifactDir = path.join(root, ".data", "generated", d.id);
+        await mkdir(artifactDir, { recursive: true });
+        const artifactPath = path.join(artifactDir, `${version.id}.${format}`);
+        await writeFile(artifactPath, rendered.bytes);
+        const recordId = `doc-${d.id}`;
+        let sourceRecord;
+        try {
+          sourceRecord = getRecord(u, recordId);
+        } catch (error) {
+          if (!(error instanceof WorkspaceError) || error.status !== 404)
+            throw error;
+          insertRecord({
+            id: recordId,
+            type: "Documents",
+            title: version.title,
+            body: version.content,
+            department: d.department,
+            owner: d.owner,
+            status: d.status,
+            updated: timestamp(),
+            data: { documentId: d.id, version: version.number },
+          });
+          sourceRecord = getRecord(u, recordId);
         }
-        response = new NextResponse(new Uint8Array(await pdf.save()), {
+        const artifacts =
+          (sourceRecord.data.artifacts as Record<string, string> | undefined) ||
+          {};
+        artifacts[format] = path.relative(root, artifactPath);
+        artifacts[`${format}Hash`] = createHash("sha256")
+          .update(rendered.bytes)
+          .digest("hex");
+        db()
+          .prepare("UPDATE records SET data=?,updated=? WHERE id=?")
+          .run(
+            JSON.stringify({ ...sourceRecord.data, artifacts }),
+            timestamp(),
+            `doc-${d.id}`,
+          );
+        const safeTitle =
+          version.title.replace(/[^\p{L}\p{N}-]+/gu, "-").slice(0, 70) ||
+          "document";
+        response = new NextResponse(new Uint8Array(rendered.bytes), {
           headers: {
-            "Content-Type": "application/pdf",
-            "Content-Disposition":
-              'attachment; filename="singularity-document.pdf"',
+            "Content-Type": rendered.mime,
+            "Content-Disposition": `attachment; filename="${safeTitle}-v${version.number}.${format}"`,
+            "Cache-Control": "private, no-store",
           },
         });
       } else response = NextResponse.json(d);
@@ -192,6 +544,11 @@ export async function POST(req: NextRequest) {
       throw new WorkspaceError("Action required");
     let result: unknown;
     switch (body.action) {
+      case "testGemini":
+        if (u.role !== "admin")
+          throw new WorkspaceError("Administrator required", 403);
+        result = await testGeminiConnection();
+        break;
       case "switchUser": {
         if (process.env.DEMO_MODE !== "true")
           throw new WorkspaceError("Persona switching is disabled", 403);
@@ -205,6 +562,12 @@ export async function POST(req: NextRequest) {
       }
       case "chat":
         result = await runChat(u, body);
+        break;
+      case "retryApproval":
+        result = await retryApprovalSubmission(
+          u,
+          z.string().min(1).max(100).parse(body.id),
+        );
         break;
       case "draft":
         result = draft(u, body);
@@ -230,6 +593,12 @@ export async function POST(req: NextRequest) {
       case "task":
         result = updateTask(u, body);
         break;
+      case "itIncident":
+        result = updateITRecord(u, body);
+        break;
+      case "createITIncident":
+        result = createITIncident(u, body);
+        break;
       case "import":
         result = importCsv(u, body);
         break;
@@ -239,6 +608,16 @@ export async function POST(req: NextRequest) {
           .run(u.id);
         result = { saved: true };
         break;
+      case "readNotification": {
+        const id = z.string().min(1).max(100).parse(body.id);
+        const updated = db()
+          .prepare("UPDATE notifications SET read=1 WHERE id=? AND userId=?")
+          .run(id, u.id);
+        if (!updated.changes)
+          throw new WorkspaceError("Notification not found", 404);
+        result = { saved: true, id };
+        break;
+      }
       case "settings": {
         if (u.role !== "admin")
           throw new WorkspaceError("Administrator required", 403);

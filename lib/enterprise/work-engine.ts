@@ -261,9 +261,14 @@ export const tools: Record<string, Tool> = {
     },
   },
   submit_approval: {
-    schema: idArgs,
+    schema: idArgs.extend({
+      reviewer: z.enum(["manager", "configured"]).optional(),
+    }),
     write: true,
-    run: (u, a) => service.submit(u, String(a.id)),
+    run: (u, a) =>
+      service.submit(u, String(a.id), {
+        reviewer: a.reviewer as "manager" | "configured" | undefined,
+      }),
   },
   return_document_version: {
     schema: z.object({ id: str, comment: str }).strict(),
@@ -819,8 +824,15 @@ export function runDetail(u: Employee, id: string) {
     .get(id) as RunRow | undefined;
   if (!r || (r.owner !== u.id && u.role !== "admin"))
     throw new service.WorkspaceError("Run unavailable", 403);
+  const safeDetail = (detail: string) =>
+    /table approvals has \d+ columns|SQLITE_(?:ERROR|CONSTRAINT)|approval_idempotency_key/i.test(
+      detail,
+    )
+      ? "Approval request could not be created. The saved draft is available for retry."
+      : detail;
   return {
     ...r,
+    error: safeDetail(r.error),
     inputs: JSON.parse(
       (
         engineDb()
@@ -835,12 +847,24 @@ export function runDetail(u: Employee, id: string) {
         .all(id) as StepRow[]
     ).map((s) => ({
       ...s,
+      error: safeDetail(s.error),
       spec: JSON.parse(s.spec),
       output: s.output ? JSON.parse(s.output) : null,
     })),
-    events: engineDb()
-      .prepare("SELECT * FROM engine_events WHERE runId=? ORDER BY id")
-      .all(id),
+    events: (
+      engineDb()
+        .prepare("SELECT * FROM engine_events WHERE runId=? ORDER BY id")
+        .all(id) as {
+        id: number;
+        runId: string;
+        stepId: string | null;
+        kind: string;
+        detail: string;
+        created: string;
+      }[]
+    ).map((e) => {
+      return { ...e, detail: safeDetail(e.detail) };
+    }),
     receipts: engineDb()
       .prepare("SELECT * FROM engine_receipts WHERE runId=? ORDER BY created")
       .all(id),
@@ -1081,7 +1105,15 @@ export async function tick(id: string) {
       if (deps.some((d) => d.status !== "COMPLETED"))
         throw new Error("Unmet dependency");
       const tool = tools[s.tool];
-      const args = tool.schema.parse(resolve(s.arguments, outputs)) as Args;
+      const resolved = resolve(s.arguments, outputs) as Args;
+      if (s.tool === "submit_approval" && !resolved.reviewer)
+        resolved.reviewer =
+          /\bmy manager\b|manager'?s approval|manager approval/i.test(
+            r.instruction,
+          )
+            ? "manager"
+            : "configured";
+      const args = tool.schema.parse(resolved) as Args;
       if (next.attempts >= 3)
         throw new Error(
           "Step retry budget exhausted (3 attempts). Create a revised run.",
@@ -1231,6 +1263,7 @@ export async function tick(id: string) {
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : "Run failed";
+    console.error("[Work Engine] Run step failed", id, message);
     atomic(() => {
       engineDb()
         .prepare(

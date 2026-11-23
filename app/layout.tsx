@@ -18,7 +18,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{document.documentElement.dataset.theme=localStorage.getItem('brahma-theme')==='dark'?'dark':'light'}catch{document.documentElement.dataset.theme='light'}",
+              "try{const p=localStorage.getItem('brahma-theme');document.documentElement.dataset.theme=(p==='dark'||(p!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches))?'dark':'light'}catch{document.documentElement.dataset.theme='light'}",
           }}
         />
       </head>

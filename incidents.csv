@@ -1,0 +1,6 @@
+﻿incident_id,project_id,title,severity,status,linked_task_id
+INC-001,ALP,Document export loses section numbering,High,Investigating,ALP-102
+INC-002,BET,Contact form staging validation error,Medium,Open,BET-102
+INC-003,GAM,Pilot manager mapping mismatch,Medium,Pending verification,GAM-103
+INC-004,DEL,Migration rehearsal login failures,High,Investigating,DEL-104
+INC-005,EPS,Ticket routing mismatch for urgent request,High,Open,EPS-102

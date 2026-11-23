@@ -1,0 +1,6 @@
+﻿approval_id,project_id,title,reviewer,status,linked_task_id,source_document_id,is_synthetic
+APR-001,ALP,Technical review of export module,Aarav Sharma,Pending,ALP-102,ALP-DOC-DECISIONS-001,True
+APR-002,BET,Client design baseline v2.1,Riya Sen,Approved,BET-104,BET-DOC-DECISIONS-001,True
+APR-003,GAM,Leave workflow QA sign-off,Kabir Ali,Returned,GAM-103,GAM-DOC-DECISIONS-001,True
+APR-004,DEL,Staging migration change request,Meera Dutta,Pending,DEL-103,DEL-DOC-DECISIONS-001,True
+APR-005,EPS,Client escalation policy v1.1,Riya Sen,Pending,EPS-102,EPS-DOC-DECISIONS-001,True

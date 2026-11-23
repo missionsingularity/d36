@@ -23,6 +23,8 @@ import {
   createProject,
   requestLeave,
   updateTask,
+  updateITRecord,
+  createITIncident,
 } from "../lib/enterprise/service";
 import { runChat, planSchema } from "../lib/enterprise/planner";
 import { importCsv, parseCsv } from "../lib/enterprise/import";
@@ -52,6 +54,46 @@ test("enterprise scenarios, permissions, exact versions and receipts", async (t)
       assert(r.incidents.every((i) => i.project === "alpha"));
     },
   );
+  await t.test("IT incident reporting, assignment and status updates", () => {
+    const incident = createITIncident(maya, {
+      title: "VPN disconnects during test run",
+      body: "The team VPN disconnects during browser checks and interrupts the session.",
+      severity: "High",
+      assetId: "asset-1",
+    });
+    assert.equal(incident.status, "Open");
+    assert.equal(incident.owner, maya.id);
+    assert.equal(incident.data.severity, "High");
+    assert.equal(incident.data.assetId, "asset-1");
+    updateITRecord(maya, { id: incident.id, status: "In progress" });
+    assert.equal(
+      snapshot(maya).records.find((r) => r.id === incident.id)?.status,
+      "In progress",
+    );
+    assert.throws(
+      () =>
+        updateITRecord(employee("noah"), {
+          id: incident.id,
+          status: "Resolved",
+        }),
+      /assigned employee or an IT manager/,
+    );
+    updateITRecord(it, { id: incident.id, owner: "noah" });
+    updateITRecord(employee("noah"), { id: incident.id, status: "Resolved" });
+    assert.equal(
+      snapshot(maya).records.find((r) => r.id === incident.id)?.status,
+      "Resolved",
+    );
+    updateITRecord(it, { id: incident.id, status: "Closed" });
+    assert.equal(
+      snapshot(maya).records.find((r) => r.id === incident.id)?.status,
+      "Closed",
+    );
+    assert.throws(
+      () => updateITRecord(it, { id: incident.id, status: "In progress" }),
+      /closed incidents cannot be reopened/,
+    );
+  });
   let replacementDocument = "";
   await t.test(
     "3. multi-step replacement draft, independent approval and idempotent execution",
@@ -73,7 +115,11 @@ test("enterprise scenarios, permissions, exact versions and receipts", async (t)
       )!;
       assert(a);
       assert.throws(() => decide(maya, { id: a.id, decision: "approve" }));
-      decide(it, { id: a.id, decision: "approve" });
+      decide(it, {
+        id: a.id,
+        decision: "approve",
+        comment: "Required checks passed.",
+      });
       const receipt = execute(it, a.id);
       assert.equal(execute(it, a.id).id, receipt.id);
       assert.equal(
@@ -183,7 +229,11 @@ test("enterprise scenarios, permissions, exact versions and receipts", async (t)
         reason: "Address reviewer",
       });
       const b = submit(maya, d.id);
-      decide(admin, { id: b, decision: "approve" });
+      decide(admin, {
+        id: b,
+        decision: "approve",
+        comment: "Reviewed the latest version.",
+      });
       revise(maya, {
         id: d.id,
         baseVersion: d.versions.at(-1)!.id,
@@ -195,6 +245,144 @@ test("enterprise scenarios, permissions, exact versions and receipts", async (t)
     },
   );
   await t.test(
+    "approval schema migration, manager resolution, exact version and idempotent submission",
+    () => {
+      const approvalCount = Number(
+        (
+          db().prepare("SELECT COUNT(*) AS count FROM approvals").get() as {
+            count: number;
+          }
+        ).count,
+      );
+      const approvalColumns = db()
+        .prepare("PRAGMA table_info(approvals)")
+        .all() as { name: string }[];
+      for (const column of ["reviewerId", "projectId", "idempotencyKey"])
+        assert(approvalColumns.some((row) => row.name === column));
+      assert(db().prepare("SELECT 1 FROM approvals LIMIT 1").get());
+      db()
+        .prepare(
+          "INSERT OR IGNORE INTO relationships(id,fromId,relation,toId) VALUES(?,?,?,?)",
+        )
+        .run("test-maya-reports-to-arjun", maya.id, "REPORTS_TO", "arjun");
+
+      const report = draft(maya, {
+        title: "Alpha weekly progress report",
+        content: "Progress and outstanding tasks from saved records.",
+        target: "alpha",
+      });
+      const exactVersion = report.versions.at(-1)!;
+      const manager = db()
+        .prepare(
+          "SELECT toId FROM relationships WHERE fromId=? AND relation='REPORTS_TO'",
+        )
+        .get(maya.id) as { toId: string };
+      const approvalId = submit(maya, report.id, {
+        reviewer: "manager",
+        idempotencyKey: `test:${report.id}:${exactVersion.id}`,
+      });
+      assert.equal(
+        submit(maya, report.id, {
+          reviewer: "manager",
+          idempotencyKey: `test:${report.id}:${exactVersion.id}`,
+        }),
+        approvalId,
+      );
+      const saved = db()
+        .prepare("SELECT * FROM approvals WHERE id=?")
+        .get(approvalId) as Record<string, string>;
+      assert.equal(saved.documentId, report.id);
+      assert.equal(saved.versionId, exactVersion.id);
+      assert.equal(saved.requester, maya.id);
+      assert.equal(saved.reviewerId, manager.toId);
+      assert.equal(saved.projectId, "alpha");
+      assert.equal(saved.status, "PENDING_APPROVAL");
+      assert.equal(
+        saved.idempotencyKey,
+        `test:${report.id}:${exactVersion.id}`,
+      );
+      assert.equal(
+        db().prepare("SELECT COUNT(*) AS count FROM approvals").get() &&
+          Number(
+            (
+              db().prepare("SELECT COUNT(*) AS count FROM approvals").get() as {
+                count: number;
+              }
+            ).count,
+          ),
+        approvalCount + 1,
+      );
+      assert(
+        db()
+          .prepare("SELECT 1 FROM audit WHERE actor=? AND detail LIKE ?")
+          .get(maya.id, `${approvalId}%`),
+      );
+      assert(
+        db()
+          .prepare("SELECT 1 FROM notifications WHERE userId=? AND text LIKE ?")
+          .get(manager.toId, `%${report.title}%`),
+      );
+      for (const relation of [
+        "REVIEWS_DOCUMENT",
+        "REQUESTED_BY",
+        "ASSIGNED_TO",
+        "FOR_PROJECT",
+      ])
+        assert(
+          db()
+            .prepare(
+              "SELECT 1 FROM relationships WHERE fromId=? AND relation=?",
+            )
+            .get(approvalId, relation),
+        );
+
+      assert.throws(() => submit(it, report.id), /owner/);
+      assert.throws(() => submit(maya, "missing-document"), /unavailable/);
+      assert(
+        snapshot(employee(manager.toId)).approvals.some(
+          (a) => a.id === approvalId,
+        ),
+      );
+
+      db()
+        .prepare("DELETE FROM relationships WHERE id=?")
+        .run("test-maya-reports-to-arjun");
+    },
+  );
+  await t.test("missing manager leaves the saved document in draft", () => {
+    const person = employee("noah");
+    const report = draft(person, {
+      title: "Manager missing check",
+      content: "This draft must remain saved.",
+      target: "alpha",
+    });
+    assert.equal(
+      db()
+        .prepare(
+          "SELECT 1 FROM relationships WHERE fromId=? AND relation='REPORTS_TO'",
+        )
+        .get(person.id),
+      undefined,
+    );
+    assert.throws(
+      () => submit(person, report.id, { reviewer: "manager" }),
+      /manager is not set/,
+    );
+    assert.equal(document(person, report.id).status, "DRAFT");
+    assert.equal(
+      Number(
+        (
+          db()
+            .prepare(
+              "SELECT COUNT(*) AS count FROM approvals WHERE documentId=?",
+            )
+            .get(report.id) as { count: number }
+        ).count,
+      ),
+      0,
+    );
+  });
+  await t.test(
     "8. HR leave balance changes exactly once after authorized approval",
     () => {
       const d = requestLeave(maya, {
@@ -205,7 +393,11 @@ test("enterprise scenarios, permissions, exact versions and receipts", async (t)
       assert.throws(() => document(it, d.id), /unavailable/);
       const a = submit(maya, d.id);
       assert.throws(() => decide(it, { id: a, decision: "approve" }));
-      decide(hr, { id: a, decision: "approve" });
+      decide(hr, {
+        id: a,
+        decision: "approve",
+        comment: "Policy and dates verified.",
+      });
       const receipt = execute(hr, a);
       assert.equal(execute(hr, a).id, receipt.id);
       assert.equal(employee("maya").leaveBalance, 15);

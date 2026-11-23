@@ -27,7 +27,7 @@ export default function WorkspaceSearch({
         id="enterprise-search"
         type="search"
         aria-label="Search across Singularity"
-        placeholder="Search across Singularity (documents, people, projects, tasks…)"
+        placeholder="Search documents, people, projects, and tasks"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {

@@ -29,6 +29,7 @@ import {
   Check,
   CheckCircle2,
   X,
+  MoreHorizontal,
   Sun,
   Moon,
   Briefcase,
@@ -39,7 +40,6 @@ import {
   Loader2,
   Link2,
   Upload,
-  MoreHorizontal,
   Command,
   BookOpen,
   ArrowRight,
@@ -47,13 +47,14 @@ import {
   AlertCircle,
   Copy,
   CircleHelp,
+  SquarePen,
 } from "lucide-react";
 import { useTheme } from "./theme-provider";
 import WorkspaceHome from "./workspace-home";
 import MessageBody from "./message-body";
-import WorkspaceSearch from "./workspace-search";
 import WorkEngine from "./work-engine";
-import WorkAgents, { agentStarters, type WorkAgent } from "./work-agents";
+import OrganizationDirectory from "./organization-directory";
+import ProjectWorkspace from "./project-workspace";
 import type {
   Snapshot,
   RecordItem,
@@ -63,11 +64,14 @@ import type {
 } from "@/lib/enterprise/types";
 
 const nav = [
-  { id: "chat", label: "New chat", icon: MessageSquare },
   { id: "", label: "Home", icon: Home },
-  { id: "work", label: "Work / Agents", icon: Briefcase },
+  { id: "work", label: "Work", icon: Briefcase },
   { id: "projects", label: "Projects", icon: Folder },
   { id: "documents", label: "Documents", icon: FileText },
+  { id: "people", label: "People", icon: Users },
+  { id: "approvals", label: "Reviews", icon: ShieldCheck },
+  { id: "it", label: "IT Operations", icon: Monitor },
+  { id: "customize", label: "Customize", icon: SlidersHorizontal },
 ];
 const date = (s: string) =>
   new Date(s).toLocaleDateString("en-GB", {
@@ -138,11 +142,19 @@ export default function EnterpriseWorkspace() {
   );
   const [toast, setToast] = useState("");
   const [collapsed, setCollapsed] = useState(false);
+  const [approvalFilter, setApprovalFilter] = useState("Pending");
+  const [profileMenu, setProfileMenu] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("General");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationBadgeEnabled, setNotificationBadgeEnabled] =
+    useState(true);
+  const [landingPagePreference, setLandingPagePreference] = useState("");
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
   const [sourceList, setSourceList] = useState<RecordItem[]>();
   const [searchDepartment, setSearchDepartment] = useState("All departments");
   const [searchOwner, setSearchOwner] = useState("Anyone");
   const [drawer, setDrawer] = useState(false);
-  const { dark, setDark } = useTheme();
+  const { appearance, setAppearance } = useTheme();
   const [prompt, setPrompt] = useState(""),
     [workMode, setWorkMode] = useState(false),
     [query, setQuery] = useState(searchParams.get("q") || ""),
@@ -156,16 +168,21 @@ export default function EnterpriseWorkspace() {
     [reason, setReason] = useState(""),
     [versionId, setVersionId] = useState("");
   const [settingsText, setSettingsText] = useState("");
+  const [geminiCheck, setGeminiCheck] = useState("");
   const [csv, setCsv] = useState(
-      "id,title,body,department\nlegacy-lt-01,SG-LT-2001,Imported laptop,IT",
+      "id,title,body,department\nlegacy-asset-01,SG-WS-2018 · QA workstation,QA workstation used for browser compatibility checks,IT\nlegacy-asset-02,SG-NAS-04 · Backup storage,Encrypted local backup storage for evaluation records,IT\nlegacy-asset-03,SG-SW-12 · Office network switch,Managed switch serving the engineering lab,IT",
     ),
     [importKind, setImportKind] = useState("Assets"),
+    [importExample, setImportExample] = useState("assets"),
     [mapping, setMapping] = useState<Record<string, string>>({
       id: "id",
       title: "title",
       body: "body",
       department: "department",
       email: "email",
+      owner: "owner",
+      project: "project",
+      members: "members",
     }),
     [importPreview, setImportPreview] = useState<{
       rows: { id: string; title: string }[];
@@ -178,6 +195,9 @@ export default function EnterpriseWorkspace() {
   const bottom = useRef<HTMLDivElement>(null);
   const renderedChat = useRef<string | undefined>(undefined);
   const modalRef = useRef<HTMLDivElement>(null);
+  const notificationPanelRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const landingPreferenceApplied = useRef(false);
   const searchSequence = useRef(0);
   const currentDocument = data?.documents.find((d) => d.id === selectedId);
   const chat = data?.chats.find((c) => c.id === selectedId);
@@ -185,6 +205,17 @@ export default function EnterpriseWorkspace() {
   const selectedVersion =
     currentDocument?.versions.find((v) => v.id === versionId) ||
     currentDocument?.versions.at(-1);
+  const visibleApprovals = (data?.approvals || [])
+    .filter((approval) => {
+      if (approvalFilter === "Pending")
+        return approval.status === "PENDING_APPROVAL";
+      if (approvalFilter === "Approved")
+        return ["APPROVED", "COMPLETED"].includes(approval.status);
+      if (approvalFilter === "Rejected") return approval.status === "REJECTED";
+      if (approvalFilter === "Returned") return approval.status === "RETURNED";
+      return true;
+    })
+    .sort((a, b) => b.created.localeCompare(a.created));
   async function refresh() {
     const res = await fetch("/api/workspace", { cache: "no-store" });
     const json = await res.json();
@@ -198,8 +229,53 @@ export default function EnterpriseWorkspace() {
       setCollapsed(
         localStorage.getItem("singularity-sidebar-collapsed") === "true",
       );
+      setNotificationBadgeEnabled(
+        localStorage.getItem("brahma-notification-badge") !== "false",
+      );
+      setLandingPagePreference(
+        localStorage.getItem("brahma-landing-page") || "",
+      );
     } catch {}
   }, []);
+  useEffect(() => {
+    if (landingPreferenceApplied.current) return;
+    landingPreferenceApplied.current = true;
+    if (
+      section === "" &&
+      !searchParams.has("q") &&
+      searchParams.get("view") !== "search"
+    ) {
+      try {
+        const preferred = localStorage.getItem("brahma-landing-page");
+        if (preferred && preferred !== "home") router.replace("/" + preferred);
+      } catch {}
+    }
+  }, [section, searchParams, router]);
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    const outside = (event: PointerEvent) => {
+      if (!notificationPanelRef.current?.contains(event.target as Node))
+        setNotificationsOpen(false);
+    };
+    window.addEventListener("pointerdown", outside);
+    return () => window.removeEventListener("pointerdown", outside);
+  }, [notificationsOpen]);
+  useEffect(() => {
+    if (!profileMenu) return;
+    const outside = (event: PointerEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node))
+        setProfileMenu(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileMenu(false);
+    };
+    window.addEventListener("pointerdown", outside);
+    window.addEventListener("keydown", escape);
+    return () => {
+      window.removeEventListener("pointerdown", outside);
+      window.removeEventListener("keydown", escape);
+    };
+  }, [profileMenu]);
   const queryString = searchParams.toString();
   useEffect(() => {
     if (section === "search") {
@@ -220,9 +296,7 @@ export default function EnterpriseWorkspace() {
     }
     if (section === "chat" && !selectedId) {
       const agent = searchParams.get("agent");
-      const initial =
-        searchParams.get("prompt") ||
-        (agent === "it" || agent === "project" ? agentStarters[agent] : "");
+      const initial = searchParams.get("prompt") || "";
       setPrompt(initial);
       setWorkMode(searchParams.get("mode") === "work" || !!agent);
     }
@@ -295,13 +369,19 @@ export default function EnterpriseWorkspace() {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
-        document.getElementById("enterprise-search")?.focus();
+        document
+          .querySelector<HTMLInputElement>(".enterprise-search-input")
+          ?.focus() ||
+          document
+            .querySelector<HTMLTextAreaElement>(".composer textarea")
+            ?.focus();
       }
       if (e.key === "Escape") {
         setModal(undefined);
         setPreview(undefined);
         setDrawer(false);
         setSourceList(undefined);
+        setNotificationsOpen(false);
       }
     };
     window.addEventListener("keydown", handler);
@@ -338,21 +418,10 @@ export default function EnterpriseWorkspace() {
   function openSearch(value = query) {
     setQuery(value);
     setSearchActive(true);
-    router.push(
-      "/?" + (value.trim() ? "q=" + encodeURIComponent(value) : "view=search"),
+    router.replace(
+      "/" + (value.trim() ? "?q=" + encodeURIComponent(value) : "?view=search"),
       { scroll: false },
     );
-  }
-  function changeSearch(value: string) {
-    setQuery(value);
-    setSearchActive(!!value.trim());
-    if (!value.trim()) {
-      setSearchDepartment("All departments");
-      setSearchOwner("Anyone");
-    }
-    const url = value.trim() ? "/?q=" + encodeURIComponent(value) : "/";
-    if (section === "") window.history.replaceState(null, "", url);
-    else router.push(url, { scroll: false });
   }
   function startConversation(value: string, work = false) {
     setPrompt(value);
@@ -362,10 +431,21 @@ export default function EnterpriseWorkspace() {
       { scroll: false },
     );
   }
-  function selectAgent(agent: WorkAgent) {
-    router.push("/work?agent=" + agent, { scroll: false });
+  function startNewChat() {
+    setPrompt("");
+    setWorkMode(false);
+    setQuery("");
+    setSearchActive(false);
+    setSearchType("All");
+    router.push("/", { scroll: false });
+    window.setTimeout(() => {
+      document
+        .querySelector<HTMLTextAreaElement>(".composer textarea")
+        ?.focus();
+    }, 40);
   }
   function go(path: string) {
+    if (path === "hr") path = "people";
     if (path === "search") {
       openSearch();
       return;
@@ -616,7 +696,7 @@ export default function EnterpriseWorkspace() {
         </div>
         <textarea
           aria-label="Ask a question or describe a task"
-          placeholder="Ask a question or describe a task..."
+          placeholder="Ask, search, or create anything..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -687,7 +767,10 @@ export default function EnterpriseWorkspace() {
             const previous = e.currentTarget
               .previousElementSibling as HTMLButtonElement | null;
             if (previous) previous.focus();
-            else document.getElementById("enterprise-search")?.focus();
+            else
+              document
+                .querySelector<HTMLTextAreaElement>(".composer textarea")
+                ?.focus();
           }
         }}
       >
@@ -711,7 +794,9 @@ export default function EnterpriseWorkspace() {
           <span className="result-meta">
             {data?.users.find((u) => u.id === r.owner)?.name || r.owner}
             <span>·</span>
-            {r.department}
+            {typeof r.data.projectCode === "string"
+              ? `Project ${r.data.projectCode}`
+              : r.department}
             <span>·</span>Updated {date(r.updated)}
             {r.data.version ? ` · v${r.data.version}` : ""}
           </span>
@@ -794,182 +879,282 @@ export default function EnterpriseWorkspace() {
           Opening your workspace…
         </div>
       );
-    if ((section === "" && !searchActive) || (section === "chat" && !chat))
+    if (section === "" || (section === "chat" && !chat))
       return (
-        <WorkspaceHome
-          data={data}
-          composer={composer()}
-          go={go}
-          startConversation={startConversation}
-          openRecord={openRecord}
-          onSearch={openSearch}
-          onAgent={selectAgent}
-          onTaskToggle={(task) => {
-            void act({
-              action: "task",
-              id: task.id,
-              status: task.status === "Done" ? "Open" : "Done",
-            });
-          }}
-          busy={busy}
-          compact={section === "chat"}
-        />
+        <>
+          <WorkspaceHome
+            data={data}
+            composer={composer()}
+            startConversation={startConversation}
+            onSearch={openSearch}
+            busy={busy}
+            compact={section === "chat"}
+          />
+          {section === "" && searchActive && (
+            <section
+              className="home-search-results"
+              aria-label="Search results"
+            >
+              <label className="enterprise-search-box">
+                <Search size={19} aria-hidden="true" />
+                <input
+                  className="enterprise-search-input"
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search documents, people, projects, tasks..."
+                  aria-label="Search across Singularity"
+                />
+                <kbd>Ctrl K</kbd>
+              </label>
+              <div className="search-tabs">
+                {[
+                  "All",
+                  "Documents",
+                  "People",
+                  "Projects",
+                  "Tasks",
+                  "IT",
+                  "HR",
+                ].map((type) => (
+                  <button
+                    key={type}
+                    className={searchType === type ? "active" : ""}
+                    onClick={() => setSearchType(type)}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+              <div className="section-heading">
+                <p className="muted">
+                  {searching
+                    ? "Searching records you can access…"
+                    : `${visibleResults.length} ${query ? "results" : "workspace records"}`}
+                </p>
+                <span className="filter-label">
+                  <ShieldCheck size={14} />
+                  Records you can access
+                </span>
+              </div>
+              <div className="search-results">
+                {visibleResults.map(sourceRow)}
+                {!searching && !visibleResults.length && (
+                  <Empty
+                    title={
+                      query ? "No matching records" : "Search your workspace"
+                    }
+                  >
+                    {query
+                      ? "Try a different name or a few words from the document."
+                      : "Type a question or record name above to find documents, people and projects."}
+                  </Empty>
+                )}
+              </div>
+            </section>
+          )}
+        </>
       );
     if (section === "chat" && chat)
       return (
         <div className="chat-page">
           <div className="chat-messages">
-            {chat.messages.map((m) => (
-              <article key={m.id} className={"message " + m.role}>
-                <div className="message-avatar">
-                  {m.role === "user" ? (
-                    initials(data.user.name)
-                  ) : (
-                    <Mark small />
-                  )}
-                </div>
-                <div>
-                  <strong>
-                    {m.role === "user" ? data.user.name : "BrahmaGPT"}
-                  </strong>
-                  {m.role === "assistant" && (
-                    <span className="answer-mode">
-                      {m.text.startsWith("OFFLINE LOCAL MODE")
-                        ? "Offline local mode"
-                        : "Live Gemini"}
-                    </span>
-                  )}
-                  {m.role === "assistant" ? (
-                    <MessageBody text={m.text} />
-                  ) : (
-                    <p className="message-text">{m.text}</p>
-                  )}
-                  {m.runId &&
-                    (() => {
-                      const w = data.workflows.find((w) => w.id === m.runId);
-                      return (
-                        w && (
-                          <>
-                            <details className="execution-details">
-                              <summary>
-                                <CheckCircle2 size={15} />
-                                {
-                                  w.events.filter(
-                                    (e) => e.status === "completed",
-                                  ).length
-                                }{" "}
-                                tool operations · {w.status}
-                                <ChevronDown size={14} />
-                              </summary>
-                              {w.events.map((e, i) => (
-                                <p key={i}>
-                                  <Status>{e.status}</Status> {e.detail}
-                                </p>
-                              ))}
-                            </details>
-                            <div className="citation-chips">
-                              {w.sources.slice(0, 5).map((r, i) => (
-                                <button
-                                  key={r.id}
-                                  onClick={() => openRecord(r)}
-                                >
-                                  <span>{i + 1}</span>
-                                  {r.title}
-                                </button>
-                              ))}
-                            </div>
-                            <div className="message-links">
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    await navigator.clipboard.writeText(
-                                      m.text.replace(
-                                        /^(LIVE GEMINI|OFFLINE LOCAL MODE)\s*\n+/,
-                                        "",
-                                      ),
-                                    );
-                                    setToast("Response copied");
-                                  } catch {
-                                    setError(
-                                      "Could not copy. Select the response text to copy it manually.",
-                                    );
-                                  }
-                                }}
-                              >
-                                <Copy size={14} />
-                                Copy response
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setPreview(undefined);
-                                  setSourceList(w.sources);
-                                }}
-                              >
-                                <BookOpen size={15} />
-                                Sources ({w.sources.length})
-                              </button>
-                              {w.status === "Failed" && !w.documentId && (
-                                <button
-                                  disabled={busy}
-                                  onClick={() => send(w.objective)}
-                                >
-                                  Retry request
-                                </button>
-                              )}
-                              <button onClick={() => go("work/" + w.id)}>
-                                <Briefcase size={15} />
-                                Open in Work
-                              </button>
-                              {w.documentId && (
-                                <button
-                                  onClick={() =>
-                                    go("documents/" + w.documentId)
-                                  }
-                                >
-                                  <FileText size={15} />
-                                  Open draft
-                                </button>
-                              )}
-                            </div>
-                            {m.id === chat.messages.at(-1)?.id &&
-                              w.status !== "Failed" && (
-                                <div className="answer-followups">
-                                  <span>Keep exploring</span>
+            {chat.messages.map((m) => {
+              const linkedWorkflow = m.runId
+                ? data.workflows.find((w) => w.id === m.runId)
+                : undefined;
+              const visibleMessage =
+                linkedWorkflow?.status === "Failed" && linkedWorkflow.documentId
+                  ? "Your report draft was saved, but the approval request could not be created. You can retry the approval submission."
+                  : m.text;
+              return (
+                <article key={m.id} className={"message " + m.role}>
+                  <div className="message-avatar">
+                    {m.role === "user" ? (
+                      initials(data.user.name)
+                    ) : (
+                      <Mark small />
+                    )}
+                  </div>
+                  <div>
+                    <strong>
+                      {m.role === "user" ? data.user.name : "BrahmaGPT"}
+                    </strong>
+                    {m.role === "assistant" && (
+                      <span className="answer-mode">
+                        {m.text.startsWith("OFFLINE LOCAL MODE")
+                          ? "Offline local mode"
+                          : "Live Gemini"}
+                      </span>
+                    )}
+                    {m.role === "assistant" ? (
+                      <MessageBody text={visibleMessage} />
+                    ) : (
+                      <p className="message-text">{m.text}</p>
+                    )}
+                    {m.runId &&
+                      (() => {
+                        const w = data.workflows.find((w) => w.id === m.runId);
+                        return (
+                          w && (
+                            <>
+                              <details className="execution-details">
+                                <summary>
+                                  <CheckCircle2 size={15} />
+                                  {
+                                    w.events.filter(
+                                      (e) => e.status === "completed",
+                                    ).length
+                                  }{" "}
+                                  tool operations · {w.status}
+                                  <ChevronDown size={14} />
+                                </summary>
+                                {w.events.map((e, i) => (
+                                  <p key={i}>
+                                    <Status>{e.status}</Status>{" "}
+                                    {w.status === "Failed" &&
+                                    w.documentId &&
+                                    /table approvals has \d+ columns|SQLITE_(?:ERROR|CONSTRAINT)/i.test(
+                                      e.detail,
+                                    )
+                                      ? "Approval submission failed. The saved draft and completed work are available for retry."
+                                      : e.detail}
+                                  </p>
+                                ))}
+                              </details>
+                              <div className="citation-chips">
+                                {w.sources.slice(0, 5).map((r, i) => (
                                   <button
-                                    onClick={() => {
-                                      setPrompt(
-                                        "Find policies related to " +
-                                          w.objective,
+                                    key={r.id}
+                                    onClick={() => openRecord(r)}
+                                  >
+                                    <span>{i + 1}</span>
+                                    {r.title}
+                                    {typeof r.data.sourceDocumentId ===
+                                      "string" && (
+                                      <small className="citation-chip-meta">
+                                        {r.data.sourceDocumentId}@v
+                                        {String(r.data.version)}
+                                      </small>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="message-links">
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await navigator.clipboard.writeText(
+                                        visibleMessage.replace(
+                                          /^(LIVE GEMINI|OFFLINE LOCAL MODE)\s*\n+/,
+                                          "",
+                                        ),
                                       );
-                                      document
-                                        .querySelector<HTMLTextAreaElement>(
-                                          ".chat-composer textarea",
-                                        )
-                                        ?.focus();
+                                      setToast("Response copied");
+                                    } catch {
+                                      setError(
+                                        "Could not copy. Select the response text to copy it manually.",
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <Copy size={14} />
+                                  Copy response
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setPreview(undefined);
+                                    setSourceList(w.sources);
+                                  }}
+                                >
+                                  <BookOpen size={15} />
+                                  Sources ({w.sources.length})
+                                </button>
+                                {w.status === "Failed" && !w.documentId && (
+                                  <button
+                                    disabled={busy}
+                                    onClick={() => send(w.objective)}
+                                  >
+                                    Retry request
+                                  </button>
+                                )}
+                                {w.status === "Failed" && w.documentId && (
+                                  <button
+                                    disabled={busy}
+                                    onClick={async () => {
+                                      const result = (await act(
+                                        { action: "retryApproval", id: w.id },
+                                        "Approval submitted",
+                                      )) as
+                                        | {
+                                            approvalId: string;
+                                            reviewer: string;
+                                          }
+                                        | undefined;
+                                      if (result)
+                                        setToast(
+                                          `Approval ${result.approvalId} sent to ${result.reviewer}`,
+                                        );
                                     }}
                                   >
-                                    Find related policies
+                                    Retry Approval
                                   </button>
+                                )}
+                                <button onClick={() => go("work/" + w.id)}>
+                                  <Briefcase size={15} />
+                                  View Workflow Details
+                                </button>
+                                {w.documentId && (
                                   <button
-                                    onClick={() => {
-                                      openSearch(
-                                        w.sources.find(
-                                          (r) => r.type === "Projects",
-                                        )?.title || "Alpha",
-                                      );
-                                    }}
+                                    onClick={() =>
+                                      go("documents/" + w.documentId)
+                                    }
                                   >
-                                    Explore in Search
+                                    <FileText size={15} />
+                                    Open draft
                                   </button>
-                                </div>
-                              )}
-                          </>
-                        )
-                      );
-                    })()}
-                </div>
-              </article>
-            ))}
+                                )}
+                              </div>
+                              {m.id === chat.messages.at(-1)?.id &&
+                                w.status !== "Failed" && (
+                                  <div className="answer-followups">
+                                    <span>Keep exploring</span>
+                                    <button
+                                      onClick={() => {
+                                        setPrompt(
+                                          "Find policies related to " +
+                                            w.objective,
+                                        );
+                                        document
+                                          .querySelector<HTMLTextAreaElement>(
+                                            ".chat-composer textarea",
+                                          )
+                                          ?.focus();
+                                      }}
+                                    >
+                                      Find related policies
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        openSearch(
+                                          w.sources.find(
+                                            (r) => r.type === "Projects",
+                                          )?.title || "",
+                                        );
+                                      }}
+                                    >
+                                      Explore in Search
+                                    </button>
+                                  </div>
+                                )}
+                            </>
+                          )
+                        );
+                      })()}
+                  </div>
+                </article>
+              );
+            })}
             {busy && (
               <p className="working-state">
                 <Loader2 className="spin" size={17} />
@@ -981,7 +1166,10 @@ export default function EnterpriseWorkspace() {
           <div className="chat-composer">
             {composer()}
             <p>
-              {data.mode} · Review important information against its sources.
+              {data.mode === "OFFLINE LOCAL MODE"
+                ? "Offline mode"
+                : "Gemini enabled"}{" "}
+              · Check each answer against its sources.
             </p>
           </div>
         </div>
@@ -998,6 +1186,18 @@ export default function EnterpriseWorkspace() {
               "Search across Singularity"
             )}
           </h1>
+          <label className="enterprise-search-box">
+            <Search size={19} aria-hidden="true" />
+            <input
+              className="enterprise-search-input"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search documents, people, projects, tasks..."
+              aria-label="Search across Singularity"
+            />
+            <kbd>Ctrl K</kbd>
+          </label>
           <div className="unified-search-actions">
             <button className="text-button" onClick={() => go("")}>
               <Home size={15} />
@@ -1009,7 +1209,7 @@ export default function EnterpriseWorkspace() {
               onClick={() => send(query)}
             >
               <MessageSquare size={15} />
-              Ask BrahmaGPT
+              Ask about these records
             </button>
           </div>
           <div className="search-tabs">
@@ -1097,7 +1297,7 @@ export default function EnterpriseWorkspace() {
             </p>
             <span className="filter-label">
               <ShieldCheck size={14} />
-              Your access only
+              Records you can access
             </span>
           </div>
           <div className="search-results">
@@ -1152,7 +1352,7 @@ export default function EnterpriseWorkspace() {
                 Documents
               </button>
               <div>
-                {["pdf", "docx"].map((format) => (
+                {["pdf", "docx", "xlsx", "pptx"].map((format) => (
                   <a
                     key={format}
                     href={
@@ -1333,9 +1533,7 @@ export default function EnterpriseWorkspace() {
           <div className="section-heading">
             <div>
               <h1>Documents</h1>
-              <p className="muted">
-                Ideas, evidence, and decisions. All in one place.
-              </p>
+              <p className="muted">Browse and open documents you can access.</p>
             </div>
             <button className="primary" onClick={() => newDocument()}>
               <Plus size={16} />
@@ -1375,7 +1573,7 @@ export default function EnterpriseWorkspace() {
               report.
             </Empty>
           )}
-          <h3 className="spaced">Workspace knowledge</h3>
+          <h3 className="spaced">Workspace documents</h3>
           {data.records
             .filter((r) => r.type === "Documents" && !r.data.documentId)
             .map(sourceRow)}
@@ -1398,20 +1596,68 @@ export default function EnterpriseWorkspace() {
     if (section === "approvals")
       return (
         <div className="standard-page">
-          <h1>Review & approvals</h1>
+          <h1>Reviews</h1>
           <p className="muted">
             Every decision is tied to an exact, immutable document version.
           </p>
-          {!data.approvals.length && (
+          <div className="approval-filters" aria-label="Filter approvals">
+            {[
+              ["Pending", "Waiting for review"],
+              ["Approved", "Approved"],
+              ["Rejected", "Rejected"],
+              ["Returned", "Returned"],
+              ["All", "All requests"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                className={approvalFilter === value ? "active" : ""}
+                aria-pressed={approvalFilter === value}
+                onClick={() => setApprovalFilter(value)}
+              >
+                {label}
+                <span>
+                  {
+                    (data.approvals || []).filter((approval) => {
+                      if (value === "Pending")
+                        return approval.status === "PENDING_APPROVAL";
+                      if (value === "Approved")
+                        return ["APPROVED", "COMPLETED"].includes(
+                          approval.status,
+                        );
+                      if (value === "Rejected")
+                        return approval.status === "REJECTED";
+                      if (value === "Returned")
+                        return approval.status === "RETURNED";
+                      return true;
+                    }).length
+                  }
+                </span>
+              </button>
+            ))}
+          </div>
+          {!visibleApprovals.length && (
             <Empty title="You’re all caught up">
-              Requests you submit or are authorized to review will appear here.
+              {data.approvals.length
+                ? `There are no ${approvalFilter.toLowerCase()} requests for you.`
+                : "Requests you submit or are assigned to review will appear here."}
             </Empty>
           )}
-          {data.approvals.map((a) => {
+          {!!data.approvals.length && (
+            <div className="inline-note approval-sample-note">
+              <ShieldCheck size={17} />
+              <span>
+                Sample requests are marked synthetic and link to saved document
+                versions. Decisions show who reviewed them and why.
+              </span>
+            </div>
+          )}
+          {visibleApprovals.map((a) => {
             const d = data.documents.find((d) => d.id === a.documentId)!;
             const v = d?.versions.find((v) => v.id === a.versionId);
             const reviewer =
-              [a.reviewerRole, "admin"].includes(data.user.role) &&
+              (a.reviewerId
+                ? a.reviewerId === data.user.id
+                : [a.reviewerRole, "admin"].includes(data.user.role)) &&
               a.requester !== data.user.id;
             return (
               <article className="approval-card" key={a.id}>
@@ -1423,7 +1669,17 @@ export default function EnterpriseWorkspace() {
                       {data.users.find((u) => u.id === a.requester)?.name} ·
                       Version {v?.number} ·{" "}
                       {a.reviewerRole.replaceAll("_", " ")}
+                      {a.reviewerId
+                        ? ` · Assigned to ${data.users.find((u) => u.id === a.reviewerId)?.name || a.reviewerId}`
+                        : ""}
                     </p>
+                    <small className="approval-context">
+                      {data.records.find((record) => record.id === d?.target)
+                        ?.title ||
+                        d?.department ||
+                        "Workspace"}{" "}
+                      · {date(a.created)} · Synthetic example
+                    </small>
                   </div>
                   <Status>{a.status}</Status>
                 </div>
@@ -1485,9 +1741,24 @@ export default function EnterpriseWorkspace() {
                         className="primary"
                         disabled={busy}
                         onClick={() =>
-                          act(
-                            { action: "decide", id: a.id, decision: "approve" },
-                            "Exact version approved",
+                          form(
+                            "Approve this version",
+                            <label>
+                              Reason for approval
+                              <textarea
+                                name="comment"
+                                required
+                                minLength={3}
+                                rows={4}
+                              />
+                            </label>,
+                            async (f) =>
+                              post({
+                                action: "decide",
+                                id: a.id,
+                                decision: "approve",
+                                comment: f.get("comment"),
+                              }),
                           )
                         }
                       >
@@ -1531,90 +1802,17 @@ export default function EnterpriseWorkspace() {
       const projects = data.records.filter((r) => r.type === "Projects");
       const p = projects.find((p) => p.id === selectedId);
       if (p) {
-        const tasks = data.records.filter(
-          (r) => r.type === "Tasks" && r.project === p.id,
-        );
-        const done = tasks.filter((t) => t.status === "Done").length;
         return (
-          <div className="standard-page">
-            <button className="text-button" onClick={() => go("projects")}>
-              All projects
-            </button>
-            <div className="section-heading">
-              <div>
-                <h1>{p.title}</h1>
-                <p className="muted">{p.body}</p>
-              </div>
-              <Status>{p.status}</Status>
-            </div>
-            <div className="project-progress">
-              <span>
-                {done} of {tasks.length} tasks complete
-              </span>
-              <strong>
-                {tasks.length ? Math.round((done / tasks.length) * 100) : 0}%
-              </strong>
-              <progress value={done} max={tasks.length || 1} />
-            </div>
-            <h3>Team</h3>
-            <div className="team-list">
-              {((p.data.members as string[]) || []).map((id) => {
-                const u = data.users.find((u) => u.id === id);
-                return (
-                  <span key={id}>
-                    <span className="avatar">{initials(u?.name || id)}</span>
-                    {u?.name}
-                  </span>
-                );
-              })}
-            </div>
-            <div className="section-heading">
-              <h3>Tasks & dependencies</h3>
-              <button
-                onClick={() => {
-                  setPrompt("Propose a task for project " + p.id + ": ");
-                  go("chat");
-                }}
-              >
-                <Plus size={15} />
-                Propose task
-              </button>
-            </div>
-            {tasks.map((t) => (
-              <div className="task-row" key={t.id}>
-                <CheckCircle2 size={17} />
-                <span>
-                  <strong>{t.title}</strong>
-                  <small>
-                    {data.users.find((u) => u.id === t.owner)?.name}
-                    {((t.data.dependsOn as string[]) || []).length
-                      ? ` · Depends on ${(t.data.dependsOn as string[]).map((id) => data.records.find((r) => r.id === id)?.title).join(", ")}`
-                      : ""}
-                  </small>
-                </span>
-                {t.owner === data.user.id || data.user.role === "admin" ? (
-                  <select
-                    aria-label={"Task status for " + t.title}
-                    value={t.status}
-                    disabled={busy}
-                    onChange={(e) =>
-                      act({ action: "task", id: t.id, status: e.target.value })
-                    }
-                  >
-                    {["Open", "In progress", "Done"].map((s) => (
-                      <option key={s}>{s}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <Status>{t.status}</Status>
-                )}
-              </div>
-            ))}
-            <h3 className="spaced">Related documents & incidents</h3>
-            {data.records
-              .filter((r) => r.project === p.id && r.type !== "Tasks")
-              .map(sourceRow)}
-          </div>
+          <ProjectWorkspace
+            project={p}
+            data={data}
+            busy={busy}
+            onTask={(id, status) =>
+              act({ action: "task", id, status }, "Task status saved")
+            }
+            onOpenRecord={openRecord}
+            onBack={() => go("projects")}
+          />
         );
       }
       return (
@@ -1685,25 +1883,142 @@ export default function EnterpriseWorkspace() {
                 Equipment, incidents, and governed replacement requests.
               </p>
             </div>
-            <button
-              className="primary"
-              disabled={busy}
-              onClick={() =>
-                send(
-                  "Find unresolved laptop issues affecting Project Alpha, check the replacement policy, prepare requests and send to the IT Manager for approval.",
-                )
-              }
-            >
-              <MessageSquare size={16} />
-              Review replacements
-            </button>
+            <div className="it-header-actions">
+              <button
+                disabled={busy}
+                onClick={() => {
+                  const project = data.records.find(
+                    (r) =>
+                      r.type === "Projects" &&
+                      (r.data.members as string[] | undefined)?.includes(
+                        data.user.id,
+                      ),
+                  );
+                  send(
+                    project
+                      ? `Find open incidents and equipment for ${project.title}. Show the related policy.`
+                      : "Find open incidents and equipment I can access.",
+                  );
+                }}
+              >
+                <MessageSquare size={16} /> Find incidents
+              </button>
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() =>
+                  form(
+                    "Log an IT incident",
+                    <>
+                      <label>
+                        What is the issue?
+                        <input name="title" required maxLength={200} />
+                      </label>
+                      <label>
+                        What happened?
+                        <textarea
+                          name="body"
+                          required
+                          rows={4}
+                          maxLength={5000}
+                        />
+                      </label>
+                      <label>
+                        Severity
+                        <select name="severity" defaultValue="Medium">
+                          <option>Low</option>
+                          <option>Medium</option>
+                          <option>High</option>
+                          <option>Critical</option>
+                        </select>
+                      </label>
+                      <label>
+                        Related asset
+                        <select name="assetId">
+                          <option value="">No asset selected</option>
+                          {data.records
+                            .filter(
+                              (r) =>
+                                r.type === "IT" && r.data.category === "Asset",
+                            )
+                            .map((asset) => (
+                              <option key={asset.id} value={asset.id}>
+                                {asset.title}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    </>,
+                    async (fields) =>
+                      post({
+                        action: "createITIncident",
+                        title: fields.get("title"),
+                        body: fields.get("body"),
+                        severity: fields.get("severity"),
+                        assetId: fields.get("assetId"),
+                      }),
+                  )
+                }
+              >
+                <Plus size={16} /> Log incident
+              </button>
+            </div>
           </div>
           <div className="inline-note">
             <Monitor size={18} />
             <span>
-              Connected to the same search, documents, approvals, and audit
+              Connected to the same search, documents, reviews, and audit
               history.
             </span>
+          </div>
+          <div className="it-summary-grid">
+            {[
+              {
+                label: "Open incidents",
+                value: data.records.filter(
+                  (r) =>
+                    r.type === "IT" &&
+                    r.data.category === "Incident" &&
+                    !["Resolved", "Closed"].includes(r.status),
+                ).length,
+                icon: AlertCircle,
+              },
+              {
+                label: "High severity",
+                value: data.records.filter(
+                  (r) =>
+                    r.type === "IT" &&
+                    r.data.category === "Incident" &&
+                    r.data.severity === "High" &&
+                    !["Resolved", "Closed"].includes(r.status),
+                ).length,
+                icon: ShieldCheck,
+              },
+              {
+                label: "Tracked assets",
+                value: data.records.filter(
+                  (r) => r.type === "IT" && r.data.category === "Asset",
+                ).length,
+                icon: Monitor,
+              },
+              {
+                label: "Services",
+                value: data.records.filter(
+                  (r) => r.type === "IT" && r.data.category === "Service",
+                ).length,
+                icon: Settings,
+              },
+            ].map((item) => (
+              <div className="it-summary-card" key={item.label}>
+                <span>
+                  <item.icon size={18} />
+                </span>
+                <div>
+                  <strong>{item.value}</strong>
+                  <small>{item.label}</small>
+                </div>
+              </div>
+            ))}
           </div>
           <h3>Unresolved incidents</h3>
           {data.records
@@ -1713,7 +2028,83 @@ export default function EnterpriseWorkspace() {
                 r.data.category === "Incident" &&
                 !["Resolved", "Closed"].includes(r.status),
             )
-            .map(sourceRow)}
+            .map((incident) => (
+              <article className="it-incident-card" key={incident.id}>
+                {sourceRow(incident)}
+                <div className="it-incident-controls">
+                  <label>
+                    Assigned to
+                    <select
+                      value={incident.owner}
+                      disabled={
+                        busy ||
+                        !["admin", "it_manager"].includes(data.user.role)
+                      }
+                      onChange={(event) =>
+                        void act(
+                          {
+                            action: "itIncident",
+                            id: incident.id,
+                            owner: event.target.value,
+                          },
+                          "Incident assignment saved",
+                        )
+                      }
+                    >
+                      {data.users
+                        .filter(
+                          (user) =>
+                            ["IT", "Engineering"].includes(user.department) ||
+                            ["admin", "it_manager"].includes(user.role),
+                        )
+                        .map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label>
+                    Status
+                    <select
+                      value={incident.status}
+                      disabled={
+                        busy ||
+                        (!["admin", "it_manager"].includes(data.user.role) &&
+                          incident.owner !== data.user.id) ||
+                        incident.status === "Closed" ||
+                        (incident.status === "Resolved" &&
+                          !["admin", "it_manager"].includes(data.user.role))
+                      }
+                      onChange={(event) =>
+                        void act(
+                          {
+                            action: "itIncident",
+                            id: incident.id,
+                            status: event.target.value,
+                          },
+                          "Incident status saved",
+                        )
+                      }
+                    >
+                      {(incident.status === "Resolved"
+                        ? ["Resolved", "Closed"]
+                        : [
+                            "Open",
+                            "In progress",
+                            "Investigating",
+                            "Pending review",
+                            "Resolved",
+                            "Closed",
+                          ]
+                      ).map((status) => (
+                        <option key={status}>{status}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </article>
+            ))}
           <h3 className="spaced">Assets & procurement</h3>
           <div className="table-wrap">
             <table>
@@ -1728,7 +2119,11 @@ export default function EnterpriseWorkspace() {
               <tbody>
                 {data.records
                   .filter(
-                    (r) => r.type === "IT" && r.data.category !== "Incident",
+                    (r) =>
+                      r.type === "IT" &&
+                      ["Asset", "Procurement"].includes(
+                        String(r.data.category),
+                      ),
                   )
                   .map((r) => (
                     <tr key={r.id}>
@@ -1756,51 +2151,38 @@ export default function EnterpriseWorkspace() {
               </tbody>
             </table>
           </div>
+          <h3 className="spaced">Services</h3>
+          <div className="it-service-grid">
+            {data.records
+              .filter((r) => r.type === "IT" && r.data.category === "Service")
+              .map((service) => (
+                <article className="it-service-card" key={service.id}>
+                  <span className="source-icon">
+                    <Monitor size={18} />
+                  </span>
+                  <div>
+                    <strong>{service.title}</strong>
+                    <p>{service.body}</p>
+                  </div>
+                  <Status>{service.status}</Status>
+                </article>
+              ))}
+          </div>
         </div>
       );
-    if (section === "hr")
+    if (section === "people" || section === "hr")
       return (
-        <div className="standard-page">
-          <div className="section-heading">
-            <div>
-              <h1>People & HR</h1>
-              <p className="muted">View employee records and request leave.</p>
-            </div>
-            <button className="primary" onClick={leaveForm}>
-              <Calendar size={16} />
-              Request leave
-            </button>
-          </div>
-          <div className="leave-balance">
-            <Calendar size={22} />
-            <span>
-              <strong>{data.user.leaveBalance} days</strong>
-              <small>Your available annual leave · working days</small>
-            </span>
-            <button
-              onClick={() =>
-                openRecord(data.records.find((r) => r.id === "policy-leave")!)
-              }
-            >
-              Read policy <ExternalLink size={14} />
-            </button>
-          </div>
-          <h3>Your permitted HR records</h3>
-          {data.records.filter((r) => r.type === "HR").map(sourceRow)}
-          <h3 className="spaced">Employee directory</h3>
-          <div className="people-grid">
-            {data.users.map((u) => (
-              <div className="person-row" key={u.id}>
-                <span className="avatar">{initials(u.name)}</span>
-                <span>
-                  <strong>{u.name}</strong>
-                  <small>{u.department}</small>
-                  <a href={"mailto:" + u.email}>{u.email}</a>
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <OrganizationDirectory
+          data={data}
+          onOpenRecord={openRecord}
+          onOpenApprovals={() => go("approvals")}
+          onRequestLeave={leaveForm}
+          onNavigateRecord={(record) =>
+            record.type === "Projects"
+              ? go("projects/" + record.id)
+              : go("documents/" + String(record.data.documentId))
+          }
+        />
       );
     if (section === "customize")
       return (
@@ -1823,6 +2205,94 @@ export default function EnterpriseWorkspace() {
           </div>
           {customTab === "Templates" && (
             <>
+              <h3 className="spaced">Workspace modules</h3>
+              <div className="custom-module-grid">
+                {[
+                  {
+                    title: "Knowledge",
+                    description:
+                      "Search approved documents and open their source versions.",
+                    count: data.records.filter((r) => r.type === "Documents")
+                      .length,
+                    detail: "documents",
+                    icon: BookOpen,
+                    action: () => go("documents"),
+                  },
+                  {
+                    title: "Projects",
+                    description:
+                      "Review project records, tasks and linked people.",
+                    count: data.records.filter((r) => r.type === "Projects")
+                      .length,
+                    detail: "projects",
+                    icon: Folder,
+                    action: () => go("projects"),
+                  },
+                  {
+                    title: "People",
+                    description:
+                      "Find employee profiles, teams and reporting lines.",
+                    count: data.users.length,
+                    detail: "employees",
+                    icon: Users,
+                    action: () => go("people"),
+                  },
+                  {
+                    title: "Reviews",
+                    description:
+                      "Review saved requests linked to exact document versions.",
+                    count: data.approvals.filter(
+                      (a) => a.status === "PENDING_APPROVAL",
+                    ).length,
+                    detail: "waiting for review",
+                    icon: ShieldCheck,
+                    action: () => go("approvals"),
+                  },
+                  {
+                    title: "IT Operations",
+                    description:
+                      "Track sample incidents, assets and service health.",
+                    count: data.records.filter(
+                      (r) =>
+                        r.type === "IT" &&
+                        r.data.category === "Incident" &&
+                        !["Resolved", "Closed"].includes(r.status),
+                    ).length,
+                    detail: "open incidents",
+                    icon: Monitor,
+                    action: () => go("it"),
+                  },
+                  {
+                    title: "Local imports",
+                    description:
+                      "Preview and reconcile a CSV file before importing it.",
+                    count: data.audit.filter((event) =>
+                      /import/i.test(event.action),
+                    ).length,
+                    detail: "saved imports",
+                    icon: Upload,
+                    action: () => setCustomTab("Legacy import"),
+                  },
+                ].map((module) => (
+                  <button
+                    className="custom-module-card"
+                    key={module.title}
+                    onClick={module.action}
+                  >
+                    <span className="custom-module-icon">
+                      <module.icon size={19} />
+                    </span>
+                    <span className="custom-module-copy">
+                      <strong>{module.title}</strong>
+                      <small>{module.description}</small>
+                      <span className="custom-module-count">
+                        {module.count} {module.detail}
+                      </span>
+                    </span>
+                    <ChevronRight size={16} />
+                  </button>
+                ))}
+              </div>
               <h3 className="spaced">Document templates</h3>
               {(
                 data.settings.templates as { name: string; content: string }[]
@@ -1850,11 +2320,18 @@ export default function EnterpriseWorkspace() {
                   className="template-row"
                   key={t}
                   onClick={() => {
+                    const project = data.records.find(
+                      (r) =>
+                        r.type === "Projects" &&
+                        (r.data.members as string[] | undefined)?.includes(
+                          data.user.id,
+                        ),
+                    );
                     setPrompt(
                       i === 0
-                        ? "Prepare laptop replacement requests for Alpha and submit for approval"
-                        : i === 1
-                          ? "Generate a Project Alpha progress report"
+                        ? "Review open tasks and prepare a request for approval"
+                        : i === 1 && project
+                          ? `Prepare a progress report for ${project.title}`
                           : "",
                     );
                     i === 2 ? leaveForm() : go("chat");
@@ -1890,10 +2367,70 @@ export default function EnterpriseWorkspace() {
                     setImportPreview(undefined);
                   }}
                 >
-                  {["Assets", "Projects", "Employees"].map((t) => (
+                  {["Assets", "Projects", "Employees", "Tasks"].map((t) => (
                     <option key={t}>{t}</option>
                   ))}
                 </select>
+              </label>
+              <label>
+                Example CSV
+                <select
+                  value={importExample}
+                  onChange={(e) => {
+                    const examples: Record<
+                      string,
+                      { kind: string; csv: string }
+                    > = {
+                      assets: {
+                        kind: "Assets",
+                        csv: "id,title,body,department\nlegacy-asset-11,SG-WS-2201 · QA workstation,QA workstation used for browser compatibility checks,IT\nlegacy-asset-12,SG-NAS-08 · Backup storage,Encrypted local backup storage for evaluation records,IT",
+                      },
+                      people: {
+                        kind: "Employees",
+                        csv: "id,title,email,department\nlegacy-employee-01,Jordan Lee,jordan.lee@example.invalid,Engineering\nlegacy-employee-02,Casey Morgan,casey.morgan@example.invalid,People",
+                      },
+                      projects: {
+                        kind: "Projects",
+                        csv: "id,title,body,department,members\nlegacy-project-northstar,Northstar knowledge cleanup,Review and tag the shared team library,Engineering,maya;noah\nlegacy-project-onboarding,New starter onboarding refresh,Update the first week checklist,People,leah;sam",
+                      },
+                      tasks: {
+                        kind: "Tasks",
+                        csv: "id,title,body,department,owner,project\nlegacy-task-search,Check search result labels,Review names and source links in search results,Engineering,maya,alpha\nlegacy-task-onboarding,Review welcome checklist,Check the first week steps with People Operations,People,leah,atlas",
+                      },
+                      nis: {
+                        kind: "Employees",
+                        csv: "id,title,email,department\nnis-sample-01,Avery Kim,avery.kim@example.invalid,Operations\nnis-sample-02,Robin Shah,robin.shah@example.invalid,Engineering",
+                      },
+                    };
+                    const sample = examples[e.target.value];
+                    setImportExample(e.target.value);
+                    setImportKind(sample.kind);
+                    setCsv(sample.csv);
+                    setMapping({
+                      id: "id",
+                      title: "title",
+                      body: "body",
+                      department: "department",
+                      email: "email",
+                      owner: "owner",
+                      project: "project",
+                      members: "members",
+                    });
+                    setImportPreview(undefined);
+                  }}
+                >
+                  <option value="assets">Asset register</option>
+                  <option value="people">Legacy employee list</option>
+                  <option value="projects">Project tracker</option>
+                  <option value="tasks">Assigned task list</option>
+                  <option value="nis">
+                    NIS style employee export (sample)
+                  </option>
+                </select>
+                <small>
+                  Examples use fictional local data. No NIS or external system
+                  is connected.
+                </small>
               </label>
               <label>
                 Choose CSV
@@ -1932,6 +2469,8 @@ export default function EnterpriseWorkspace() {
                   "body",
                   "department",
                   ...(importKind === "Employees" ? ["email"] : []),
+                  ...(importKind === "Tasks" ? ["owner", "project"] : []),
+                  ...(importKind === "Projects" ? ["members"] : []),
                 ].map((key) => (
                   <label key={key}>
                     {key}
@@ -2079,15 +2618,34 @@ export default function EnterpriseWorkspace() {
           )}
         </div>
       );
-    if (section === "settings")
+    if (section === "profile")
       return (
-        <div className="standard-page settings-page">
-          <h1>Settings</h1>
+        <div className="standard-page profile-page">
+          <h1>Profile</h1>
+          <p className="muted">Your workspace identity and account details.</p>
+          <section className="profile-summary-card">
+            <span className="profile-large-avatar">
+              {initials(data.user.name)}
+            </span>
+            <div>
+              <h2>{data.user.name}</h2>
+              <p>{data.user.email}</p>
+              <Status>{data.user.role}</Status>
+            </div>
+          </section>
           <section>
-            <h3>Profile & local demo identity</h3>
+            <h3>Work details</h3>
+            <p>
+              <strong>Team</strong> · {data.user.department}
+            </p>
+            <p>
+              <strong>Leave available</strong> · {data.user.leaveBalance} days
+            </p>
+          </section>
+          <section>
+            <h3>Switch employee</h3>
             <p className="muted">
-              All accounts are fictional. Role switching is for this local
-              prototype.
+              Change the active sample account to view its work and approvals.
             </p>
             <label>
               Active employee
@@ -2095,12 +2653,12 @@ export default function EnterpriseWorkspace() {
                 aria-label="Active employee"
                 value={data.user.id}
                 disabled={busy}
-                onChange={(e) => {
-                  act(
-                    { action: "switchUser", id: e.target.value },
-                    "Active employee changed",
+                onChange={async (event) => {
+                  await act(
+                    { action: "switchUser", id: event.target.value },
+                    "Profile changed",
                   );
-                  go("settings");
+                  go("profile");
                 }}
               >
                 {data.users.map((u) => (
@@ -2110,69 +2668,280 @@ export default function EnterpriseWorkspace() {
                 ))}
               </select>
             </label>
-            <p>
-              {data.user.email} · {data.user.department}
-            </p>
           </section>
-          <section>
-            <h3>Appearance</h3>
-            <div className="appearance-options">
-              <button
-                className={!dark ? "selected" : ""}
-                onClick={() => setDark(false)}
-              >
-                <Sun size={18} />
-                Light
-              </button>
-              <button
-                className={dark ? "selected" : ""}
-                onClick={() => setDark(true)}
-              >
-                <Moon size={18} />
-                Dark
-              </button>
+        </div>
+      );
+    if (section === "settings")
+      return (
+        <div className="standard-page settings-page">
+          <h1>Settings</h1>
+          <div className="settings-layout">
+            <nav className="settings-nav" aria-label="Settings sections">
+              {["General", "Appearance", "Usage", "Gemini", "Activity"].map(
+                (tab) => (
+                  <button
+                    key={tab}
+                    className={settingsTab === tab ? "active" : ""}
+                    aria-current={settingsTab === tab ? "page" : undefined}
+                    onClick={() => setSettingsTab(tab)}
+                  >
+                    {tab === "Appearance" ? (
+                      <Sun size={16} />
+                    ) : tab === "Usage" ? (
+                      <Briefcase size={16} />
+                    ) : tab === "Gemini" ? (
+                      <CircleHelp size={16} />
+                    ) : tab === "Activity" ? (
+                      <History size={16} />
+                    ) : (
+                      <Settings size={16} />
+                    )}
+                    {tab}
+                  </button>
+                ),
+              )}
+            </nav>
+            <div className="settings-content">
+              {settingsTab === "Appearance" && (
+                <section>
+                  <h3>Appearance</h3>
+                  <p className="muted">
+                    Choose how BrahmaGPT looks on this device.
+                  </p>
+                  <div className="appearance-options appearance-options-chatgpt">
+                    {(
+                      [
+                        ["system", "System", Monitor],
+                        ["light", "Light", Sun],
+                        ["dark", "Dark", Moon],
+                      ] as const
+                    ).map(([mode, label, Icon]) => (
+                      <button
+                        key={mode}
+                        className={appearance === mode ? "selected" : ""}
+                        aria-pressed={appearance === mode}
+                        onClick={() => setAppearance(mode)}
+                      >
+                        <Icon size={18} />
+                        <span>{label}</span>
+                        <small>
+                          {mode === "system"
+                            ? "Match your device"
+                            : mode === "light"
+                              ? "Bright workspace"
+                              : "Low-light workspace"}
+                        </small>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {settingsTab === "General" && (
+                <section>
+                  <h3>Preferences</h3>
+                  <label className="settings-field">
+                    Start page
+                    <select
+                      value={landingPagePreference || "home"}
+                      onChange={(event) => {
+                        setLandingPagePreference(event.target.value);
+                        try {
+                          localStorage.setItem(
+                            "brahma-landing-page",
+                            event.target.value,
+                          );
+                        } catch {}
+                      }}
+                    >
+                      {[
+                        ["home", "Home"],
+                        ["work", "Work"],
+                        ["projects", "Projects"],
+                        ["documents", "Documents"],
+                        ["people", "People"],
+                        ["approvals", "Reviews"],
+                        ["it", "IT Operations"],
+                      ].map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <small>Used the next time you open the workspace.</small>
+                  </label>
+                  <div className="settings-preference-row">
+                    <span>
+                      <strong>Compact sidebar</strong>
+                      <small>
+                        Show icons only to leave more room for your work.
+                      </small>
+                    </span>
+                    <button
+                      className="secondary-button"
+                      onClick={() => {
+                        const next = !collapsed;
+                        setCollapsed(next);
+                        try {
+                          localStorage.setItem(
+                            "singularity-sidebar-collapsed",
+                            String(next),
+                          );
+                        } catch {}
+                      }}
+                    >
+                      {collapsed ? "Show labels" : "Make compact"}
+                    </button>
+                  </div>
+                  <label className="settings-toggle-row">
+                    <span>
+                      <strong>Show unread badge</strong>
+                      <small>
+                        Show a dot on the bell when you have new notifications.
+                      </small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={notificationBadgeEnabled}
+                      onChange={(event) => {
+                        setNotificationBadgeEnabled(event.target.checked);
+                        try {
+                          localStorage.setItem(
+                            "brahma-notification-badge",
+                            String(event.target.checked),
+                          );
+                        } catch {}
+                      }}
+                    />
+                  </label>
+                </section>
+              )}
+              {settingsTab === "Usage" && (
+                <section>
+                  <h3>Workspace activity</h3>
+                  <p className="muted">Counts from records you can access.</p>
+                  <div className="settings-usage-grid">
+                    {[
+                      [
+                        "Documents",
+                        data.records.filter((r) => r.type === "Documents")
+                          .length,
+                      ],
+                      [
+                        "Tasks",
+                        data.records.filter((r) => r.type === "Tasks").length,
+                      ],
+                      ["Reviews", data.approvals.length],
+                      ["Work sessions", data.workflows.length],
+                      ["Conversations", data.chats.length],
+                      ["Recent searches", data.searchHistory.length],
+                    ].map(([label, count]) => (
+                      <div key={label}>
+                        <strong>{count}</strong>
+                        <small>{label}</small>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {settingsTab === "Usage" && (
+                <section>
+                  <h3>My access</h3>
+                  <p className="muted">
+                    Your role is{" "}
+                    <strong>{data.user.role.replaceAll("_", " ")}</strong>.
+                    Workspace modules enabled for your organization:
+                  </p>
+                  <div className="settings-access-list">
+                    {[
+                      "Home",
+                      "Work",
+                      "Projects",
+                      "Documents",
+                      "People",
+                      "Reviews",
+                      ...(((data.settings.modules as string[]) || []).includes(
+                        "IT",
+                      )
+                        ? ["IT Operations"]
+                        : []),
+                    ].map((item) => (
+                      <span key={item}>{item}</span>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {settingsTab === "Gemini" && (
+                <section>
+                  <div className="section-heading">
+                    <h3>Gemini connection</h3>
+                    <Status>{data.mode}</Status>
+                  </div>
+                  <p className="muted">
+                    Your key stays on the server. It is never sent to this
+                    browser.
+                  </p>
+                  <ol className="setup-steps">
+                    <li>
+                      Open{" "}
+                      <code>C:\Users\spond\Singularity\d36\.env.local</code>
+                    </li>
+                    <li>
+                      Add your key after <code>GEMINI_API_KEY=</code>
+                    </li>
+                    <li>
+                      Restart the app with <code>npm.cmd run dev</code>
+                    </li>
+                  </ol>
+                  <p>
+                    Model: <code>{data.model}</code>. Set{" "}
+                    <code>GEMINI_MODEL</code> in the same file to change it.
+                  </p>
+                  <button
+                    disabled={busy || data.user.role !== "admin"}
+                    onClick={async () => {
+                      setGeminiCheck("");
+                      try {
+                        const result = await post({ action: "testGemini" });
+                        setGeminiCheck(
+                          `Connected to ${result.model} in ${result.elapsedMs} ms.`,
+                        );
+                      } catch {
+                        setGeminiCheck(
+                          "Connection failed. See the message above for the fix.",
+                        );
+                      }
+                    }}
+                  >
+                    Test Gemini connection
+                  </button>
+                  {geminiCheck && (
+                    <p role="status" className="muted">
+                      {geminiCheck}
+                    </p>
+                  )}
+                  <p className="muted">
+                    Without a key, local search, predefined workflows,
+                    documents, and authorized approvals work in offline local
+                    mode.
+                  </p>
+                </section>
+              )}
+              {settingsTab === "Activity" && (
+                <section>
+                  <h3>Activity & audit trail</h3>
+                  {data.audit.slice(0, 20).map((a) => (
+                    <div className="audit-row" key={a.id}>
+                      <span>
+                        <strong>{a.action}</strong>
+                        <small>{a.detail}</small>
+                      </span>
+                      <small>{date(a.created)}</small>
+                    </div>
+                  ))}
+                </section>
+              )}
             </div>
-          </section>
-          <section>
-            <div className="section-heading">
-              <h3>Gemini connection</h3>
-              <Status>{data.mode}</Status>
-            </div>
-            <p className="muted">
-              Your key stays on the server. It is never sent to this browser.
-            </p>
-            <ol className="setup-steps">
-              <li>
-                Open <code>C:\Users\spond\Singularity\d36\.env.local</code>
-              </li>
-              <li>
-                Add your key after <code>GEMINI_API_KEY=</code>
-              </li>
-              <li>
-                Restart the app with <code>npm.cmd run dev</code>
-              </li>
-            </ol>
-            <p>
-              Model: <code>{data.model}</code>. Set <code>GEMINI_MODEL</code> in
-              the same file to change it.
-            </p>
-            <p className="muted">
-              Without a key, local search, predefined workflows, documents, and
-              authorized approvals work in offline local mode.
-            </p>
-          </section>
-          <section>
-            <h3>Activity & audit trail</h3>
-            {data.audit.slice(0, 20).map((a) => (
-              <div className="audit-row" key={a.id}>
-                <span>
-                  <strong>{a.action}</strong>
-                  <small>{a.detail}</small>
-                </span>
-                <small>{date(a.created)}</small>
-              </div>
-            ))}
-          </section>
+          </div>
         </div>
       );
     return (
@@ -2237,40 +3006,12 @@ export default function EnterpriseWorkspace() {
           <ChevronDown size={14} />
         </button>
         <nav aria-label="Main navigation">
-          {nav.map((n) => (
-            <button
-              title={n.label}
-              key={n.id}
-              className={
-                (section === n.id ? "active" : "") +
-                (n.id === "chat" ? " new-chat-nav" : "")
-              }
-              onClick={() => {
-                go(n.id);
-                if (n.id === "chat") setPrompt("");
-              }}
-            >
-              {n.id === "chat" ? <Plus size={18} /> : <n.icon size={18} />}
-              <span>{n.label}</span>
-              {n.id === "search" && <kbd>⌘ K</kbd>}
-            </button>
-          ))}
-        </nav>
-        <p className="nav-caption">WORKSPACE</p>
-        <nav aria-label="Workspace modules">
-          {[
-            { id: "it", label: "IT Operations", icon: Monitor },
-            { id: "hr", label: "People & HR", icon: Users },
-            { id: "approvals", label: "Approvals", icon: ShieldCheck },
-            { id: "customize", label: "Customize", icon: SlidersHorizontal },
-          ]
+          {nav
             .filter(
               (n) =>
-                ["approvals", "customize"].includes(n.id) ||
+                n.id !== "it" ||
                 !data ||
-                ((data.settings.modules as string[]) || []).includes(
-                  n.id.toUpperCase(),
-                ),
+                ((data.settings.modules as string[]) || []).includes("IT"),
             )
             .map((n) => (
               <button
@@ -2281,23 +3022,71 @@ export default function EnterpriseWorkspace() {
               >
                 <n.icon size={18} />
                 <span>{n.label}</span>
-                {n.id === "approvals" &&
-                  !!data?.approvals.filter(
-                    (a) => a.status === "PENDING_APPROVAL",
-                  ).length && (
-                    <span className="nav-count">
-                      {
-                        data.approvals.filter(
-                          (a) => a.status === "PENDING_APPROVAL",
-                        ).length
-                      }
-                    </span>
-                  )}
               </button>
             ))}
         </nav>
         <div className="sidebar-recents">
-          <p className="nav-caption">RECENT CHATS</p>
+          <div className="recent-heading">
+            <p className="nav-caption">Recent Chats</p>
+            <button
+              className="new-chat-button"
+              title="New chat"
+              aria-label="New chat"
+              onClick={startNewChat}
+            >
+              <SquarePen size={16} />
+            </button>
+          </div>
+          <button
+            className="all-chats-link"
+            onClick={() => {
+              setChatSearchQuery("");
+              setModal({
+                title: "Search chats",
+                content: (
+                  <div className="conversation-picker">
+                    <label className="org-search">
+                      <Search size={17} />
+                      <input
+                        autoFocus
+                        value={chatSearchQuery}
+                        onChange={(event) =>
+                          setChatSearchQuery(event.target.value)
+                        }
+                        placeholder="Search your conversations"
+                      />
+                    </label>
+                    {(data?.chats || [])
+                      .filter((chat) =>
+                        `${chat.title} ${chat.messages.map((message) => message.text).join(" ")}`
+                          .toLowerCase()
+                          .includes(chatSearchQuery.toLowerCase()),
+                      )
+                      .map((chat) => (
+                        <button
+                          key={chat.id}
+                          onClick={() => {
+                            setModal(undefined);
+                            go("chat/" + chat.id);
+                          }}
+                        >
+                          <MessageSquare size={17} />
+                          {chat.title}
+                        </button>
+                      ))}
+                    {!(data?.chats || []).some((chat) =>
+                      `${chat.title} ${chat.messages.map((message) => message.text).join(" ")}`
+                        .toLowerCase()
+                        .includes(chatSearchQuery.toLowerCase()),
+                    ) && <p className="muted">No matching conversations.</p>}
+                  </div>
+                ),
+              });
+            }}
+          >
+            <Search size={15} />
+            Search chats
+          </button>
           {data?.chats.slice(0, 4).map((c) => (
             <button
               title={c.title}
@@ -2340,25 +3129,51 @@ export default function EnterpriseWorkspace() {
             </button>
           )}
         </div>
-        <div className="sidebar-bottom">
+        <div className="sidebar-bottom" ref={profileMenuRef}>
           <button
-            className={section === "settings" ? "active" : ""}
-            onClick={() => go("settings")}
-            title="Settings"
+            className="profile-button"
+            aria-label="Open account menu"
+            aria-haspopup="menu"
+            aria-expanded={profileMenu}
+            onClick={() => setProfileMenu((open) => !open)}
           >
-            <Settings size={18} />
-            <span>Settings</span>
-          </button>
-          <button className="profile-button" onClick={() => go("settings")}>
             <span className="avatar">
               {initials(data?.user.name || "Maya Rao")}
             </span>
             <span>
               <strong>{data?.user.name || "Maya Rao"}</strong>
-              <small>{data?.user.email || "Your workspace"}</small>
+              <small>
+                {data?.user.role.replaceAll("_", " ") || "Workspace member"}
+              </small>
             </span>
             <MoreHorizontal size={17} />
           </button>
+          {profileMenu && (
+            <div className="profile-menu" role="menu" aria-label="Account menu">
+              <div className="profile-menu-header">
+                <strong>{data?.user.name}</strong>
+                <small>{data?.user.email}</small>
+              </div>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setProfileMenu(false);
+                  go("profile");
+                }}
+              >
+                <Users size={16} /> Profile
+              </button>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setProfileMenu(false);
+                  go("settings");
+                }}
+              >
+                <Settings size={16} /> Settings
+              </button>
+            </div>
+          )}
         </div>
       </aside>
       <main className="main-shell">
@@ -2373,30 +3188,100 @@ export default function EnterpriseWorkspace() {
           >
             <PanelLeftOpen size={20} />
           </button>
-          <WorkspaceSearch
-            value={query}
-            onChange={changeSearch}
-            onSubmit={() => {
-              openSearch();
-              if (query.trim())
-                fetch(
-                  "/api/workspace?q=" + encodeURIComponent(query) + "&save=1",
-                )
-                  .then(() => refresh())
-                  .catch((e) => setError(e.message));
-            }}
-            onClear={() => changeSearch("")}
-            active={searchActive}
-          />
           <div className="topbar-actions">
-            <button
-              className="notification-button"
-              aria-label="Notifications"
-              onClick={() => go("notifications")}
-            >
-              <Bell size={20} />
-              {!!data?.notifications.some((n) => !n.read) && <span />}
-            </button>
+            <div className="notification-wrap" ref={notificationPanelRef}>
+              <button
+                className="notification-button"
+                aria-label="Notifications"
+                aria-expanded={notificationsOpen}
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+              >
+                <Bell size={20} />
+                {notificationBadgeEnabled &&
+                  !!data?.notifications.filter((n) => !n.read).length && (
+                    <span>
+                      {Math.min(
+                        data.notifications.filter((n) => !n.read).length,
+                        9,
+                      )}
+                    </span>
+                  )}
+              </button>
+              {notificationsOpen && data && (
+                <div
+                  className="notification-popover"
+                  role="dialog"
+                  aria-label="Recent notifications"
+                >
+                  <div className="notification-popover-heading">
+                    <span>
+                      <strong>Notifications</strong>
+                      <small>
+                        {data.notifications.filter((n) => !n.read).length}{" "}
+                        unread
+                      </small>
+                    </span>
+                    <button
+                      disabled={
+                        !data.notifications.some((n) => !n.read) || busy
+                      }
+                      onClick={() =>
+                        void act(
+                          { action: "readNotifications" },
+                          "Notifications marked as read",
+                        )
+                      }
+                    >
+                      Mark all read
+                    </button>
+                  </div>
+                  <div className="notification-popover-list">
+                    {data.notifications.slice(0, 6).map((notification) => (
+                      <button
+                        className={
+                          "notification-popover-item " +
+                          (!notification.read ? "unread" : "")
+                        }
+                        key={notification.id}
+                        onClick={() => {
+                          if (!notification.read)
+                            void act(
+                              {
+                                action: "readNotification",
+                                id: notification.id,
+                              },
+                              "Notification marked as read",
+                            );
+                        }}
+                      >
+                        <span className="notification-popover-icon">
+                          <Bell size={15} />
+                        </span>
+                        <span>
+                          <strong>{notification.text}</strong>
+                          <small>{date(notification.created)}</small>
+                        </span>
+                        {!notification.read && <span className="unread-dot" />}
+                      </button>
+                    ))}
+                    {!data.notifications.length && (
+                      <p className="notification-empty">
+                        You’re all caught up.
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    className="notification-view-all"
+                    onClick={() => {
+                      setNotificationsOpen(false);
+                      go("notifications");
+                    }}
+                  >
+                    View all notifications <ArrowRight size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               aria-label="Workspace help"
               onClick={() =>
@@ -2405,14 +3290,13 @@ export default function EnterpriseWorkspace() {
                   content: (
                     <div className="workspace-help">
                       <p>
-                        Search from the top bar to find documents, people,
-                        projects and tasks. Use Ctrl + K to focus search from
-                        anywhere.
+                        Use the Search button under the Home prompt to find
+                        documents, people, projects and tasks. Press Ctrl + K to
+                        focus the prompt.
                       </p>
                       <p>
-                        Start a New chat to ask a question or prepare work.
-                        Featured agents open a focused task you can review
-                        before running.
+                        Go to Home to ask a question or prepare work. Use Work
+                        to review saved tasks and agent runs.
                       </p>
                       <p>
                         Open citations to inspect sources. Work shows saved
@@ -2430,16 +3314,6 @@ export default function EnterpriseWorkspace() {
               }
             >
               <CircleHelp size={20} />
-            </button>
-            <button aria-label="Settings" onClick={() => go("settings")}>
-              <Settings size={20} />
-            </button>
-            <button
-              className="topbar-avatar avatar"
-              aria-label="Profile and settings"
-              onClick={() => go("settings")}
-            >
-              {initials(data?.user.name || "Maya Rao")}
             </button>
           </div>
         </header>
@@ -2535,8 +3409,26 @@ export default function EnterpriseWorkspace() {
             <dl>
               <dt>Record ID</dt>
               <dd>{preview.id}</dd>
+              {typeof preview.data.sourceDocumentId === "string" && (
+                <>
+                  <dt>Document citation</dt>
+                  <dd>
+                    {preview.data.sourceDocumentId}@v
+                    {String(preview.data.version)}
+                  </dd>
+                  <dt>Available sections</dt>
+                  <dd className="source-section-list">
+                    {Array.isArray(preview.data.sectionAnchors)
+                      ? (preview.data.sectionAnchors as string[]).join(" · ")
+                      : "See the source document"}
+                  </dd>
+                </>
+              )}
               <dt>Owner</dt>
-              <dd>{data?.users.find((u) => u.id === preview.owner)?.name}</dd>
+              <dd>
+                {data?.users.find((u) => u.id === preview.owner)?.name ||
+                  preview.owner}
+              </dd>
               {preview.project && (
                 <>
                   <dt>Related project</dt>
@@ -2557,6 +3449,43 @@ export default function EnterpriseWorkspace() {
                 </>
               )}
             </dl>
+            {typeof preview.data.sourceFile === "string" && (
+              <div className="source-file-links">
+                <h4>Source files</h4>
+                <a
+                  href={`/api/workspace?source=${encodeURIComponent(preview.id)}&rendition=docx`}
+                  className="source-file-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <FileText size={16} />
+                  <span>
+                    <strong>Open original Word file</strong>
+                    <small>Checked against the indexed file version</small>
+                  </span>
+                  <ExternalLink size={15} />
+                </a>
+                {typeof preview.data.pdfFile === "string" &&
+                  preview.data.pdfFile && (
+                    <a
+                      href={`/api/workspace?source=${encodeURIComponent(preview.id)}&rendition=pdf`}
+                      className="source-file-link"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <FileText size={16} />
+                      <span>
+                        <strong>Open PDF copy</strong>
+                        <small>Alternate file for this charter</small>
+                      </span>
+                      <ExternalLink size={15} />
+                    </a>
+                  )}
+                <small className="source-demo-label">
+                  DEMO · Synthetic source document
+                </small>
+              </div>
+            )}
             <h4>Related records</h4>
             {data?.records
               .filter(

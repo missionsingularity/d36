@@ -222,17 +222,50 @@ export function revise(u: Employee, input: unknown) {
     return document(u, d.id);
   });
 }
-export function submit(u: Employee, id: string) {
+export function submit(
+  u: Employee,
+  id: string,
+  options: {
+    reviewer?: "manager" | "configured";
+    idempotencyKey?: string;
+  } = {},
+) {
   return atomic(() => {
     const d = document(u, id);
     if (d.owner !== u.id)
       throw new WorkspaceError("Only the owner can submit", 403);
+    const version = d.versions.at(-1)!;
+    const idempotencyKey =
+      options.idempotencyKey || `document:${d.id}:version:${version.id}`;
+    const previous = db()
+      .prepare(
+        "SELECT id,documentId,versionId,requester FROM approvals WHERE versionId=? OR idempotencyKey=? ORDER BY created DESC LIMIT 1",
+      )
+      .get(version.id, idempotencyKey) as
+      | {
+          id: string;
+          documentId: string;
+          versionId: string;
+          requester: string;
+        }
+      | undefined;
+    if (previous) {
+      if (
+        previous.documentId !== d.id ||
+        previous.versionId !== version.id ||
+        previous.requester !== u.id
+      )
+        throw new WorkspaceError(
+          "This approval key is already linked to another request",
+          409,
+        );
+      return previous.id;
+    }
     if (d.status !== "DRAFT")
       throw new WorkspaceError(
         "Save a new draft version before submitting",
         409,
       );
-    const version = d.versions.at(-1)!;
     const settings = JSON.parse(
       (
         db().prepare("SELECT payload FROM settings WHERE id=1").get() as {
@@ -240,28 +273,89 @@ export function submit(u: Employee, id: string) {
         }
       ).payload,
     );
-    const role = settings.approvalRules?.[d.kind] || "admin";
+    const configuredRole = settings.approvalRules?.[d.kind] || "admin";
+    let reviewer: Employee | undefined;
+    let reviewerRole = configuredRole;
+    if (options.reviewer === "manager") {
+      const reportingLine = db()
+        .prepare(
+          "SELECT toId FROM relationships WHERE fromId=? AND relation='REPORTS_TO' ORDER BY rowid LIMIT 1",
+        )
+        .get(u.id) as { toId: string } | undefined;
+      if (!reportingLine)
+        throw new WorkspaceError(
+          "Your manager is not set in the organization directory",
+          409,
+        );
+      reviewer = employee(reportingLine.toId);
+      if (reviewer.id === u.id)
+        throw new WorkspaceError(
+          "A separate manager must review this draft",
+          409,
+        );
+      reviewerRole = reviewer.role;
+    } else {
+      const assigned = db()
+        .prepare(
+          "SELECT id FROM employees WHERE role=? AND id<>? ORDER BY id LIMIT 1",
+        )
+        .get(configuredRole, u.id) as { id: string } | undefined;
+      const fallback =
+        assigned ||
+        (configuredRole !== "admin"
+          ? (db()
+              .prepare(
+                "SELECT id FROM employees WHERE role='admin' AND id<>? ORDER BY id LIMIT 1",
+              )
+              .get(u.id) as { id: string } | undefined)
+          : undefined);
+      if (!fallback)
+        throw new WorkspaceError(
+          `No authorized ${configuredRole} reviewer is available`,
+          409,
+        );
+      reviewer = employee(fallback.id);
+    }
+    const project = d.target
+      ? (db()
+          .prepare("SELECT id FROM records WHERE type='Projects' AND id=?")
+          .get(d.target) as { id: string } | undefined)
+      : undefined;
+    const projectId = project?.id || null;
     const approvalId = uid();
     db()
-      .prepare("INSERT INTO approvals VALUES(?,?,?,?,?,?,?,?)")
+      .prepare(
+        "INSERT INTO approvals(id,documentId,versionId,requester,reviewerRole,status,comment,created,reviewerId,projectId,idempotencyKey) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+      )
       .run(
         approvalId,
         d.id,
         version.id,
         u.id,
-        role,
+        reviewerRole,
         "PENDING_APPROVAL",
         "",
         timestamp(),
+        reviewer.id,
+        projectId,
+        idempotencyKey,
       );
     db()
       .prepare("UPDATE documents SET status=? WHERE id=?")
       .run("PENDING_APPROVAL", d.id);
-    for (const reviewer of db()
-      .prepare("SELECT id FROM employees WHERE role=? OR role=?")
-      .all(role, "admin") as { id: string }[])
-      notify(reviewer.id, `Review requested: ${d.title}`);
-    log(u.id, "Approval requested", approvalId + ": " + version.id);
+    notify(reviewer.id, `Review requested: ${d.title}`);
+    const relate = db().prepare(
+      "INSERT OR IGNORE INTO relationships(id,fromId,relation,toId) VALUES(?,?,?,?)",
+    );
+    relate.run(uid(), approvalId, "REVIEWS_DOCUMENT", d.id);
+    relate.run(uid(), approvalId, "REQUESTED_BY", u.id);
+    relate.run(uid(), approvalId, "ASSIGNED_TO", reviewer.id);
+    if (projectId) relate.run(uid(), approvalId, "FOR_PROJECT", projectId);
+    log(
+      u.id,
+      "Approval requested",
+      `${approvalId}: ${version.id}; reviewer ${reviewer.id}; project ${projectId || "none"}`,
+    );
     return approvalId;
   });
 }
@@ -278,7 +372,12 @@ export function decide(u: Employee, input: unknown) {
       .prepare("SELECT * FROM approvals WHERE id=?")
       .get(v.id) as unknown as Approval;
     if (!a) throw new WorkspaceError("Approval not found", 404);
-    if (![a.reviewerRole, "admin"].includes(u.role) || u.id === a.requester)
+    if (
+      (a.reviewerId
+        ? a.reviewerId !== u.id && u.role !== "admin"
+        : ![a.reviewerRole, "admin"].includes(u.role)) ||
+      u.id === a.requester
+    )
       throw new WorkspaceError(
         "An independent authorized reviewer is required",
         403,
@@ -288,8 +387,8 @@ export function decide(u: Employee, input: unknown) {
     const d = document(u, a.documentId);
     if (d.versions.at(-1)?.id !== a.versionId)
       throw new WorkspaceError("Approval version mismatch", 409);
-    if (v.decision !== "approve" && !v.comment.trim())
-      throw new WorkspaceError("Add reviewer comments before returning");
+    if (!v.comment.trim())
+      throw new WorkspaceError("Add a reason before saving your decision");
     const status =
       v.decision === "approve"
         ? "APPROVED"
@@ -311,6 +410,16 @@ export function decide(u: Employee, input: unknown) {
       .prepare("UPDATE approvals SET status=?,comment=? WHERE id=?")
       .run(status, v.comment, a.id);
     db().prepare("UPDATE documents SET status=? WHERE id=?").run(status, d.id);
+    for (const linked of db()
+      .prepare("SELECT id,data FROM records WHERE type='Documents'")
+      .all() as { id: string; data: string }[]) {
+      if (
+        (JSON.parse(linked.data) as { documentId?: string }).documentId === d.id
+      )
+        db()
+          .prepare("UPDATE records SET status=?,updated=? WHERE id=?")
+          .run(status, timestamp(), linked.id);
+    }
     if (status === "RETURNED") {
       const version = d.versions.at(-1)!;
       addVersion(
@@ -332,7 +441,12 @@ export function execute(u: Employee, approvalId: string) {
       .prepare("SELECT * FROM approvals WHERE id=?")
       .get(approvalId) as unknown as Approval;
     if (!a) throw new WorkspaceError("Approval not found", 404);
-    if (![a.reviewerRole, "admin"].includes(u.role) || u.id === a.requester)
+    if (
+      (a.reviewerId
+        ? a.reviewerId !== u.id && u.role !== "admin"
+        : ![a.reviewerRole, "admin"].includes(u.role)) ||
+      u.id === a.requester
+    )
       throw new WorkspaceError("Authorized independent reviewer required", 403);
     const existing = db()
       .prepare("SELECT * FROM receipts WHERE approvalId=?")
@@ -534,15 +648,35 @@ export function replacement(u: Employee, id: string) {
 }
 export function snapshot(u: Employee): Snapshot {
   const docs = documents(u);
+  const visibleRecords = records(u);
+  const visibleIds = new Set([
+    ...visibleRecords.map((r) => r.id),
+    ...(db().prepare("SELECT id FROM employees").all() as { id: string }[]).map(
+      (r) => r.id,
+    ),
+    "management",
+    "engineering",
+    "product",
+    "design",
+    "quality",
+    "operations",
+    "people",
+    "finance",
+  ]);
   const approvals = (
     db()
       .prepare("SELECT * FROM approvals ORDER BY created DESC")
       .all() as unknown as Approval[]
   )
     .filter(
-      (a) => a.requester === u.id || [a.reviewerRole, "admin"].includes(u.role),
+      (a) =>
+        a.requester === u.id ||
+        (a.reviewerId
+          ? a.reviewerId === u.id || u.role === "admin"
+          : [a.reviewerRole, "admin"].includes(u.role)),
     )
     .filter((a) => docs.some((d) => d.id === a.documentId));
+  for (const approval of approvals) visibleIds.add(approval.id);
   const chats = (
     db()
       .prepare("SELECT * FROM chats WHERE owner=? ORDER BY rowid DESC")
@@ -564,7 +698,12 @@ export function snapshot(u: Employee): Snapshot {
           ? r.leaveBalance
           : 0,
     })) as unknown as Employee[],
-    records: records(u),
+    records: visibleRecords,
+    relationships: (
+      db()
+        .prepare("SELECT id,fromId,relation,toId FROM relationships")
+        .all() as Snapshot["relationships"]
+    )?.filter((r) => visibleIds.has(r.fromId) && visibleIds.has(r.toId)),
     documents: docs,
     approvals,
     workflows: (
@@ -648,12 +787,35 @@ export function createProject(u: Employee, input: unknown) {
 }
 export function updateTask(u: Employee, input: unknown) {
   const v = z
-    .object({ id: text, status: z.enum(["Open", "In progress", "Done"]) })
+    .object({
+      id: text,
+      status: z.enum([
+        "Open",
+        "In progress",
+        "Done",
+        "To Do",
+        "In Progress",
+        "Review",
+        "Blocked",
+        "Cancelled",
+      ]),
+    })
     .parse(input);
   return atomic(() => {
     const t = getRecord(u, v.id);
     if (t.type !== "Tasks" || (t.owner !== u.id && u.role !== "admin"))
       throw new WorkspaceError("Only the owner can update this task", 403);
+    const current =
+      t.status.toLowerCase() === "open"
+        ? "To Do"
+        : t.status.toLowerCase() === "in progress"
+          ? "In Progress"
+          : t.status;
+    if (["Done", "Cancelled"].includes(current) && current !== v.status)
+      throw new WorkspaceError(
+        "A completed or cancelled task cannot be reopened. Create a follow-up task instead.",
+        409,
+      );
     if (
       v.status === "Done" &&
       ((t.data.dependsOn as string[]) || []).some(
@@ -665,5 +827,136 @@ export function updateTask(u: Employee, input: unknown) {
       .prepare("UPDATE records SET status=?,updated=? WHERE id=?")
       .run(v.status, timestamp(), t.id);
     log(u.id, "Task status updated", t.id + ": " + v.status);
+    const reporter = t.data.reporter;
+    if (typeof reporter === "string" && reporter !== u.id)
+      notify(reporter, `${t.title}: status changed to ${v.status}`);
+  });
+}
+export function updateITRecord(u: Employee, input: unknown) {
+  const v = z
+    .object({
+      id: text,
+      status: z
+        .enum([
+          "Open",
+          "In progress",
+          "Investigating",
+          "Pending review",
+          "Resolved",
+          "Closed",
+        ])
+        .optional(),
+      owner: z.string().optional(),
+    })
+    .refine((value) => value.status || value.owner, "Choose a status or owner")
+    .parse(input);
+  return atomic(() => {
+    const incident = getRecord(u, v.id);
+    if (incident.type !== "IT" || incident.data.category !== "Incident")
+      throw new WorkspaceError("Incident not found", 404);
+    const manager = ["admin", "it_manager"].includes(u.role);
+    if (!manager && incident.owner !== u.id)
+      throw new WorkspaceError(
+        "Only the assigned employee or an IT manager can update this incident",
+        403,
+      );
+    if (!manager && v.owner)
+      throw new WorkspaceError(
+        "Only an IT manager can reassign an incident",
+        403,
+      );
+    if (
+      v.status &&
+      ((incident.status === "Closed" && v.status !== "Closed") ||
+        (incident.status === "Resolved" &&
+          !["Resolved", "Closed"].includes(v.status)))
+    )
+      throw new WorkspaceError(
+        "Resolved incidents can only be closed; closed incidents cannot be reopened here",
+        409,
+      );
+    if (v.status === "Closed" && !manager)
+      throw new WorkspaceError("Only an IT manager can close an incident", 403);
+    const owner = v.owner ? employee(v.owner) : employee(incident.owner);
+    if (
+      owner.department !== "IT" &&
+      owner.department !== "Engineering" &&
+      !["admin", "it_manager"].includes(owner.role)
+    )
+      throw new WorkspaceError(
+        "Assign incidents to IT or Engineering staff",
+        400,
+      );
+    const status = v.status || incident.status;
+    db()
+      .prepare("UPDATE records SET owner=?,status=?,updated=? WHERE id=?")
+      .run(owner.id, status, timestamp(), incident.id);
+    log(
+      u.id,
+      "IT incident updated",
+      `${incident.id}: ${status}; owner ${owner.id}`,
+    );
+    if (owner.id !== incident.owner)
+      notify(owner.id, `Incident assigned to you: ${incident.title}`);
+    return { id: incident.id, status, owner: owner.id };
+  });
+}
+export function createITIncident(u: Employee, input: unknown) {
+  const v = z
+    .object({
+      title: text.max(200),
+      body: text.max(5000),
+      severity: z.enum(["Low", "Medium", "High", "Critical"]),
+      assetId: z.string().max(100).default(""),
+    })
+    .parse(input);
+  return atomic(() => {
+    let asset: RecordItem | undefined;
+    if (v.assetId) {
+      asset = getRecord(u, v.assetId);
+      if (asset.type !== "IT" || asset.data.category !== "Asset")
+        throw new WorkspaceError("Select a saved IT asset", 400);
+    }
+    const existing = db()
+      .prepare("SELECT data FROM records WHERE type='IT'")
+      .all() as { data: string }[];
+    const incidentNumbers = existing
+      .map((row) =>
+        String(
+          (JSON.parse(row.data) as Record<string, unknown>).incidentId || "",
+        ),
+      )
+      .map((id) => Number(id.match(/^INC-(\d+)$/i)?.[1] || 0));
+    const incidentId = `INC-${String(Math.max(0, ...incidentNumbers) + 1).padStart(3, "0")}`;
+    const incident: RecordItem = {
+      id: uid(),
+      type: "IT",
+      title: `${incidentId} · ${v.title}`,
+      body: v.body,
+      department: "IT",
+      owner: u.id,
+      project: asset?.project,
+      status: "Open",
+      updated: timestamp(),
+      data: {
+        category: "Incident",
+        incidentId,
+        severity: v.severity,
+        ...(asset ? { assetId: asset.id } : {}),
+        source: "Singularity IT incident report",
+      },
+    };
+    insertRecord(incident);
+    const managers = db()
+      .prepare("SELECT id FROM employees WHERE role IN ('admin','it_manager')")
+      .all() as { id: string }[];
+    for (const manager of managers)
+      notify(manager.id, `New IT incident ${incidentId}: ${v.title}`);
+    log(
+      u.id,
+      "IT incident reported",
+      `${incidentId}: ${v.title}; severity ${v.severity}`,
+    );
+    return incident;
   });
 }

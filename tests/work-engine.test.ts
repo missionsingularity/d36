@@ -55,7 +55,11 @@ test("durable Work Engine scenarios", async (t) => {
       const approval = r.steps.find((s) => s.id === "approval")!
         .output as string;
       assert.throws(() => execute(maya, approval), /reviewer/);
-      decide(it, { id: approval, decision: "approve" });
+      decide(it, {
+        id: approval,
+        decision: "approve",
+        comment: "Replacement evidence reviewed.",
+      });
       execute(it, approval);
       await tick(id);
       r = runDetail(maya, id);
@@ -63,6 +67,133 @@ test("durable Work Engine scenarios", async (t) => {
       assert.equal(r.receipts.length, 2);
       await tick(id);
       assert.equal(runDetail(maya, id).receipts.length, 2);
+    },
+  );
+  await t.test(
+    "approval retry preserves completed progress and draft steps without duplicating the request",
+    async () => {
+      db()
+        .prepare(
+          "INSERT OR IGNORE INTO relationships(id,fromId,relation,toId) VALUES(?,?,?,?)",
+        )
+        .run("test-maya-reports-to-arjun", maya.id, "REPORTS_TO", it.id);
+      const agent = saveAgent(admin, {
+        name: "Retryable weekly report",
+        description:
+          "Calculate progress, save a report and request manager review.",
+        instructions:
+          "Submit the saved report for the requester's manager review.",
+        scopes: ["workspace"],
+        allowedTools: [
+          "calculate_project_progress",
+          "create_document_draft",
+          "submit_approval",
+        ],
+        approvalPolicy: "none",
+        published: true,
+        steps: [
+          {
+            id: "progress",
+            tool: "calculate_project_progress",
+            arguments: { id: "alpha" },
+            dependsOn: [],
+            approvalPolicy: "none",
+          },
+          {
+            id: "report",
+            tool: "create_document_draft",
+            arguments: {
+              title: "Alpha retry report",
+              content: "$progress",
+              kind: "note",
+              target: "alpha",
+            },
+            dependsOn: ["progress"],
+            approvalPolicy: "none",
+          },
+          {
+            id: "approval",
+            tool: "submit_approval",
+            arguments: { id: "$report.id", reviewer: "manager" },
+            dependsOn: ["report"],
+            approvalPolicy: "none",
+          },
+        ],
+      });
+      db().exec(
+        "CREATE TRIGGER fail_test_approval BEFORE INSERT ON approvals WHEN NEW.idempotencyKey LIKE 'document:%' BEGIN SELECT RAISE(ABORT,'simulated database write failure'); END",
+      );
+      const id = launch(maya, {
+        agentId: agent.id,
+        instruction:
+          "Prepare the weekly report and send it for my manager's approval",
+        mode: "workflow",
+      });
+      try {
+        await tick(id);
+        let run = runDetail(maya, id);
+        assert.equal(run.status, "FAILED");
+        assert.equal(run.steps[0].status, "COMPLETED");
+        assert.equal(run.steps[1].status, "COMPLETED");
+        assert.equal(run.steps[2].status, "QUEUED");
+        const draftId = (run.steps[1].output as { id: string }).id;
+        const exactVersion = document(maya, draftId).versions.at(-1)!;
+        assert.equal(document(maya, draftId).status, "DRAFT");
+        assert.equal(
+          Number(
+            (
+              db()
+                .prepare("SELECT COUNT(*) AS count FROM documents WHERE id=?")
+                .get(draftId) as { count: number }
+            ).count,
+          ),
+          1,
+        );
+
+        db().exec("DROP TRIGGER fail_test_approval");
+        control(maya, id, "retry");
+        await tick(id);
+        run = runDetail(maya, id);
+        assert.equal(run.status, "COMPLETED");
+        assert.equal(run.steps[0].attempts, 1);
+        assert.equal(run.steps[1].attempts, 1);
+        assert.equal(run.steps[2].status, "COMPLETED");
+        const approvalId = run.steps[2].output as string;
+        const saved = db()
+          .prepare("SELECT * FROM approvals WHERE id=?")
+          .get(approvalId) as {
+          documentId: string;
+          versionId: string;
+          requester: string;
+          reviewerId: string;
+          projectId: string;
+          status: string;
+        };
+        assert.equal(saved.documentId, draftId);
+        assert.equal(saved.versionId, exactVersion.id);
+        assert.equal(saved.requester, maya.id);
+        assert.equal(saved.reviewerId, it.id);
+        assert.equal(saved.projectId, "alpha");
+        assert.equal(saved.status, "PENDING_APPROVAL");
+        assert.equal(document(maya, draftId).versions.length, 1);
+        assert.equal(
+          Number(
+            (
+              db()
+                .prepare(
+                  "SELECT COUNT(*) AS count FROM approvals WHERE versionId=?",
+                )
+                .get(exactVersion.id) as { count: number }
+            ).count,
+          ),
+          1,
+        );
+      } finally {
+        db().exec("DROP TRIGGER IF EXISTS fail_test_approval");
+        db()
+          .prepare("DELETE FROM relationships WHERE id=?")
+          .run("test-maya-reports-to-arjun");
+      }
     },
   );
   await t.test(
@@ -151,7 +282,11 @@ test("durable Work Engine scenarios", async (t) => {
     const run = runDetail(maya, id);
     assert.equal(run.status, "WAITING_FOR_APPROVAL");
     const a = run.steps.find((s) => s.id === "approval")!.output as string;
-    decide(hr, { id: a, decision: "approve" });
+    decide(hr, {
+      id: a,
+      decision: "approve",
+      comment: "Leave balance and dates reviewed.",
+    });
     const first = execute(hr, a);
     assert.deepEqual(execute(hr, a), first);
     assert.equal(employee("maya").leaveBalance, 16);

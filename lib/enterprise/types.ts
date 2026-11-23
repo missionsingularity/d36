@@ -45,6 +45,9 @@ export type Approval = {
   versionId: string;
   requester: string;
   reviewerRole: string;
+  reviewerId?: string;
+  projectId?: string;
+  idempotencyKey?: string;
   status: string;
   comment: string;
   created: string;
@@ -106,4 +109,10 @@ export type Snapshot = {
   mode: string;
   model: string;
   searchHistory: string[];
+  relationships?: {
+    id: string;
+    fromId: string;
+    relation: string;
+    toId: string;
+  }[];
 };

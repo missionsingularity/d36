@@ -33,7 +33,7 @@ const tabs = [
   "My Work",
   "Agent Library",
   "Runs",
-  "Approvals",
+  "Reviews",
   "History",
 ];
 const initial = {
@@ -47,7 +47,7 @@ const initial = {
     {
       id: "search",
       tool: "search_records",
-      arguments: { query: "Alpha" },
+      arguments: { query: "" },
       dependsOn: [],
       approvalPolicy: "none" as const,
     },
@@ -847,7 +847,7 @@ export default function WorkEngine({
             </p>
           ))}
         </section>
-      ) : tab === "Approvals" ? (
+      ) : tab === "Reviews" ? (
         <>
           <button className="approval-banner" onClick={onApprovals}>
             <ShieldCheck /> Open document version approvals{" "}
@@ -933,33 +933,6 @@ export default function WorkEngine({
         <>
           {tab === "Overview" && (
             <>
-              <div className="engine-card engine-intent">
-                <label>
-                  Ask BrahmaGPT to carry out work
-                  <textarea
-                    value={instruction}
-                    onChange={(e) => setInstruction(e.target.value)}
-                    placeholder="Prepare a project report, research a policy, or review IT replacements…"
-                  />
-                </label>
-                <button
-                  className="primary"
-                  disabled={busy || !instruction.trim()}
-                  onClick={async () => {
-                    const agentId = /laptop|replace|incident/i.test(instruction)
-                      ? "it"
-                      : /project|report|progress/i.test(instruction)
-                        ? "project"
-                        : "research";
-                    const id = await action("launch", {
-                      input: { agentId, instruction, mode: "auto" },
-                    });
-                    if (id) router.push("/work?run=" + id);
-                  }}
-                >
-                  <Play size={16} /> Start in Auto
-                </button>
-              </div>
               <div className="engine-metrics">
                 {[
                   [
@@ -1017,27 +990,25 @@ export default function WorkEngine({
               <div className="engine-home-panels">
                 <section className="engine-card">
                   <div className="hub-section-heading">
-                    <h2>Assigned to you</h2>
+                    <h2>All tasks assigned to you</h2>
                     <CheckCircle2 size={18} />
                   </div>
                   {workspace.records
-                    .filter(
-                      (r) =>
-                        r.type === "Tasks" &&
-                        r.owner === user.id &&
-                        r.status !== "Done",
-                    )
-                    .slice(0, 4)
+                    .filter((r) => r.type === "Tasks" && r.owner === user.id)
                     .map((r) => (
                       <div className="engine-assigned" key={r.id}>
                         <input
                           type="checkbox"
                           aria-label={"Complete " + r.title}
-                          disabled={((r.data.dependsOn as string[]) || []).some(
-                            (id) =>
-                              workspace.records.find((t) => t.id === id)
-                                ?.status !== "Done",
-                          )}
+                          checked={r.status === "Done"}
+                          disabled={
+                            r.status === "Done" ||
+                            ((r.data.dependsOn as string[]) || []).some(
+                              (id) =>
+                                workspace.records.find((t) => t.id === id)
+                                  ?.status !== "Done",
+                            )
+                          }
                           onChange={() => onTask(r.id, "Done")}
                         />
                         <button onClick={() => onOpenSource(r)}>
@@ -1051,7 +1022,7 @@ export default function WorkEngine({
                 </section>
                 <section className="engine-card">
                   <div className="hub-section-heading">
-                    <h2>Company knowledge</h2>
+                    <h2>Documents you can access</h2>
                     <FileText size={18} />
                   </div>
                   {workspace.records
@@ -1074,6 +1045,47 @@ export default function WorkEngine({
                 </section>
               </div>
             </>
+          )}
+          {tab === "My Work" && (
+            <section className="engine-card" aria-label="Tasks assigned to you">
+              <div className="hub-section-heading">
+                <h2>Tasks assigned to you</h2>
+                <ListTodo size={18} />
+              </div>
+              {workspace.records
+                .filter((r) => r.type === "Tasks" && r.owner === user.id)
+                .map((task) => {
+                  const blocked = (
+                    (task.data.dependsOn as string[]) || []
+                  ).some(
+                    (id) =>
+                      workspace.records.find((record) => record.id === id)
+                        ?.status !== "Done",
+                  );
+                  return (
+                    <div className="engine-assigned" key={task.id}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Complete ${task.title}`}
+                        checked={task.status === "Done"}
+                        disabled={task.status === "Done" || blocked}
+                        onChange={() => onTask(task.id, "Done")}
+                      />
+                      <button onClick={() => onOpenSource(task)}>
+                        <strong>{task.title}</strong>
+                        <small>
+                          {task.status} ·{" "}
+                          {workspace.records.find((r) => r.id === task.project)
+                            ?.title || task.department}
+                        </small>
+                      </button>
+                    </div>
+                  );
+                })}
+              {!workspace.records.some(
+                (r) => r.type === "Tasks" && r.owner === user.id,
+              ) && <p className="muted">No tasks are assigned to you yet.</p>}
+            </section>
           )}
           <div className="hub-section-heading">
             <h2>
