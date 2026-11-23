@@ -3,8 +3,10 @@ export type Employee = {
   name: string;
   email: string;
   department: string;
-  role: "employee" | "it_manager" | "hr_manager" | "admin" | "viewer";
+  role: "employee" | "manager" | "it_manager" | "hr_manager" | "admin" | "viewer";
   leaveBalance: number;
+  demoAdmin?: boolean;
+  demoRole?: "admin" | "manager" | "employee";
 };
 export type RecordItem = {
   id: string;

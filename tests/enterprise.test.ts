@@ -50,7 +50,7 @@ test("enterprise scenarios, permissions, exact versions and receipts", async (t)
       const r = replacement(maya, "asset-1");
       assert.equal(r.incidents.length, 2);
       assert(r.eligible);
-      assert(!replacement(maya, "asset-2").eligible);
+      assert(!replacement(it, "asset-2").eligible);
       assert(r.incidents.every((i) => i.project === "alpha"));
     },
   );
@@ -67,7 +67,7 @@ test("enterprise scenarios, permissions, exact versions and receipts", async (t)
     assert.equal(incident.data.assetId, "asset-1");
     updateITRecord(maya, { id: incident.id, status: "In progress" });
     assert.equal(
-      snapshot(maya).records.find((r) => r.id === incident.id)?.status,
+      snapshot(it).records.find((r) => r.id === incident.id)?.status,
       "In progress",
     );
     assert.throws(
@@ -76,17 +76,17 @@ test("enterprise scenarios, permissions, exact versions and receipts", async (t)
           id: incident.id,
           status: "Resolved",
         }),
-      /assigned employee or an IT manager/,
+      /Record unavailable/,
     );
     updateITRecord(it, { id: incident.id, owner: "noah" });
     updateITRecord(employee("noah"), { id: incident.id, status: "Resolved" });
     assert.equal(
-      snapshot(maya).records.find((r) => r.id === incident.id)?.status,
+      snapshot(it).records.find((r) => r.id === incident.id)?.status,
       "Resolved",
     );
     updateITRecord(it, { id: incident.id, status: "Closed" });
     assert.equal(
-      snapshot(maya).records.find((r) => r.id === incident.id)?.status,
+      snapshot(it).records.find((r) => r.id === incident.id)?.status,
       "Closed",
     );
     assert.throws(
@@ -177,6 +177,19 @@ test("enterprise scenarios, permissions, exact versions and receipts", async (t)
       );
     },
   );
+  await t.test("admin, manager and employee snapshots follow different data scopes", () => {
+    const manager = { ...maya, role: "manager" as const };
+    const worker = employee("noah");
+    const adminSnapshot = snapshot(admin);
+    const managerSnapshot = snapshot(manager);
+    const employeeSnapshot = snapshot(worker);
+    assert(adminSnapshot.records.some((record) => record.id === "hr-noah"));
+    assert(!managerSnapshot.records.some((record) => record.id === "hr-noah"));
+    assert(!employeeSnapshot.records.some((record) => record.id === "asset-1"));
+    assert(employeeSnapshot.records.some((record) => record.id === "task-2"));
+    assert(employeeSnapshot.users.length < adminSnapshot.users.length);
+    assert(managerSnapshot.approvals.length >= employeeSnapshot.approvals.length);
+  });
   await t.test("project manager can edit task details with stale-write protection", () => {
     const manager = maya;
     const before = snapshot(maya).records.find((record) => record.id === "task-2")!;
@@ -449,7 +462,7 @@ test("enterprise scenarios, permissions, exact versions and receipts", async (t)
       assert.equal(preview.rows[0].title, "Legacy, laptop");
       const saved = importCsv(admin, { ...args, confirm: true });
       assert("receipt" in saved);
-      assert(search(maya, "Legacy").some((r) => r.id === "legacy-1"));
+      assert(search(admin, "Legacy").some((r) => r.id === "legacy-1"));
       assert.throws(
         () => importCsv(admin, { ...args, confirm: true }),
         /duplicate/,

@@ -30,7 +30,7 @@ function fail(e: unknown) {
 }
 export async function GET(req: NextRequest) {
   try {
-    const u = identity(req);
+    const u = await identity(req);
     if (!u) throw new WorkspaceError("Session required", 401);
     const id = req.nextUrl.searchParams.get("run");
     return NextResponse.json(id ? runDetail(u, id) : overview(u));
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       throw new WorkspaceError("Same-origin request required", 403);
     if (Number(req.headers.get("content-length") || 0) > 150000)
       throw new Error("Request too large");
-    const u = identity(req),
+    const u = await identity(req),
       b = await req.json();
     if (!u) throw new WorkspaceError("Session required", 401);
     requireWorkspaceWriteAccess(u);

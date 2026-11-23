@@ -37,6 +37,7 @@ import {
   Download,
   History,
   ExternalLink,
+  LogOut,
   Loader2,
   Link2,
   Upload,
@@ -56,6 +57,7 @@ import MessageBody from "./message-body";
 import WorkEngine from "./work-engine";
 import OrganizationDirectory from "./organization-directory";
 import ProjectWorkspace from "./project-workspace";
+import LoginPanel from "./login-panel";
 import type {
   Snapshot,
   RecordItem,
@@ -134,6 +136,8 @@ export default function EnterpriseWorkspace() {
     section = parts[0] || "",
     selectedId = parts[1];
   const [data, setData] = useState<Snapshot>();
+  const [authState, setAuthState] = useState<"checking" | "signedIn" | "signedOut">("checking");
+  const [setupAvailable, setSetupAvailable] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [searchActive, setSearchActive] = useState(
@@ -227,12 +231,26 @@ export default function EnterpriseWorkspace() {
   async function refresh() {
     const res = await fetch("/api/workspace", { cache: "no-store" });
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error);
+    if (!res.ok) {
+      if (res.status === 401) {
+        setAuthState("signedOut");
+        setData(undefined);
+      }
+      throw new Error(json.error);
+    }
     setData(json);
+    setAuthState("signedIn");
     return json as Snapshot;
   }
   useEffect(() => {
-    refresh().catch((e) => setError(e.message));
+    refresh().catch((e) => {
+      setError(e.message);
+      if (e instanceof Error && e.message !== "Sign in required.") setAuthState("signedOut");
+    });
+    fetch("/api/auth", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((result) => setSetupAvailable(Boolean(result.setupAvailable)))
+      .catch(() => undefined);
     try {
       setCollapsed(
         localStorage.getItem("singularity-sidebar-collapsed") === "true",
@@ -481,6 +499,7 @@ export default function EnterpriseWorkspace() {
         body: JSON.stringify(body),
       });
       const json = await res.json();
+      if (res.status === 401) setAuthState("signedOut");
       if (!res.ok) throw new Error(json.error);
       await refresh();
       return json.result;
@@ -501,6 +520,36 @@ export default function EnterpriseWorkspace() {
       return result;
     } catch {
       return undefined;
+    }
+  }
+  async function signOut() {
+    await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "logout" }),
+    }).catch(() => undefined);
+    setData(undefined);
+    setAuthState("signedOut");
+    setProfileMenu(false);
+    router.replace("/");
+  }
+  async function changeDemoRole(role: "admin" | "manager" | "employee") {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "switchDemoRole", role }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      setProfileMenu(false);
+      router.replace("/");
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not switch role.");
+    } finally {
+      setBusy(false);
     }
   }
   async function send(text = prompt) {
@@ -2994,6 +3043,34 @@ export default function EnterpriseWorkspace() {
       </div>
     );
   };
+  if (
+    data &&
+    ((section === "customize" && data.user.role !== "admin") ||
+      (section === "it" && !["admin", "manager", "it_manager"].includes(data.user.role)))
+  ) {
+    return (
+      <div className="standard-page">
+        <Empty title="You don’t have access to this area">
+          Ask your workspace administrator if you need access.
+        </Empty>
+        <button onClick={() => go("")}>Back to home</button>
+      </div>
+    );
+  }
+  if (authState !== "signedIn" || !data) {
+    if (authState === "checking")
+      return <div className="loading">Checking your sign-in…</div>;
+    return (
+      <LoginPanel
+        setupAvailable={setupAvailable}
+        onLogin={async () => {
+          await refresh();
+          setError("");
+          router.replace("/");
+        }}
+      />
+    );
+  }
   return (
     <div
       className={
@@ -3049,10 +3126,12 @@ export default function EnterpriseWorkspace() {
         <nav aria-label="Main navigation">
           {nav
             .filter(
-              (n) =>
-                n.id !== "it" ||
-                !data ||
-                ((data.settings.modules as string[]) || []).includes("IT"),
+              (n) => {
+                const role = data.user.role;
+                if (n.id === "customize" && role !== "admin") return false;
+                if (n.id === "it" && !["admin", "manager", "it_manager"].includes(role)) return false;
+                return n.id !== "it" || ((data.settings.modules as string[]) || []).includes("IT");
+              },
             )
             .map((n) => (
               <button
@@ -3212,6 +3291,19 @@ export default function EnterpriseWorkspace() {
                 }}
               >
                 <Settings size={16} /> Settings
+              </button>
+              {data?.user.demoAdmin && (
+                <div className="demo-role-switch" role="group" aria-label="Switch demo role">
+                  <span>Switch Demo Role</span>
+                  {(["admin", "manager", "employee"] as const).map((role) => (
+                    <button key={role} role="menuitemradio" aria-checked={data.user.demoRole === role} disabled={busy || data.user.demoRole === role} onClick={() => void changeDemoRole(role)}>
+                      {role[0].toUpperCase() + role.slice(1)}{data.user.demoRole === role ? " · current" : ""}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button role="menuitem" onClick={() => void signOut()}>
+                <LogOut size={16} /> Sign out
               </button>
             </div>
           )}

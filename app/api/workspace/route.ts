@@ -14,8 +14,6 @@ import {
 } from "@/lib/enterprise/db";
 import {
   identity,
-  PUBLIC_VIEWER_TOKEN,
-  publicViewerIdentity,
   requireWorkspaceWriteAccess,
 } from "@/lib/enterprise/auth";
 import {
@@ -352,20 +350,8 @@ async function retryApprovalSubmission(
 }
 export async function GET(req: NextRequest) {
   try {
-    let u = identity(req);
-    let token: string | undefined;
-    if (!u) {
-      if (process.env.VERCEL === "1") {
-        u = publicViewerIdentity();
-        token = PUBLIC_VIEWER_TOKEN;
-      } else {
-        u = employee("maya");
-        token = uid();
-        db()
-          .prepare("INSERT INTO sessions VALUES(?,?,?)")
-          .run(token, u.id, Date.now() + 86400000);
-      }
-    }
+    const u = await identity(req);
+    if (!u) throw new WorkspaceError("Sign in required.", 401);
     const url = req.nextUrl;
     let response: NextResponse;
     if (url.searchParams.has("source")) {
@@ -516,16 +502,6 @@ export async function GET(req: NextRequest) {
         });
       } else response = NextResponse.json(d);
     } else response = NextResponse.json(snapshot(u));
-    if (token)
-      response.cookies.set("singularity-session", token, {
-        httpOnly: true,
-        sameSite: "strict",
-        secure:
-          process.env.VERCEL === "1" ||
-          process.env.SECURE_COOKIES === "true",
-        path: "/",
-        maxAge: 86400,
-      });
     return response;
   } catch (e) {
     return failure(e);
@@ -542,7 +518,7 @@ export async function POST(req: NextRequest) {
       throw new WorkspaceError("Same-origin request required", 403);
     if (Number(req.headers.get("content-length") || 0) > 1500000)
       throw new WorkspaceError("Request too large", 413);
-    const u = identity(req);
+    const u = await identity(req);
     if (!u)
       throw new WorkspaceError(
         "Reload the workspace to establish a local session",
@@ -559,17 +535,8 @@ export async function POST(req: NextRequest) {
           throw new WorkspaceError("Administrator required", 403);
         result = await testGeminiConnection();
         break;
-      case "switchUser": {
-        if (process.env.VERCEL === "1" || process.env.DEMO_MODE !== "true")
-          throw new WorkspaceError("Persona switching is disabled", 403);
-        const next = employee(z.string().parse(body.id));
-        db()
-          .prepare("UPDATE sessions SET userId=? WHERE token=?")
-          .run(next.id, req.cookies.get("singularity-session")!.value);
-        log(u.id, "Demo persona switched", next.id);
-        result = { id: next.id };
-        break;
-      }
+      case "switchUser":
+        throw new WorkspaceError("Use the authorized Switch Demo Role account option.", 403);
       case "chat":
         result = await runChat(u, body);
         break;

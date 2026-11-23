@@ -39,13 +39,35 @@ export function employee(id: string) {
 }
 export function canRead(
   u: Employee,
-  r: { type?: string; department: string; owner: string },
+  r: { id?: string; type?: string; department: string; owner: string; project?: string; target?: string; data?: Record<string, unknown> },
 ) {
-  return (
-    r.department !== "HR" ||
-    r.owner === u.id ||
-    ["hr_manager", "admin"].includes(u.role)
-  );
+  const recordType = r.type || "Documents";
+  if (u.role === "admin") return true;
+  if (r.department === "HR" && r.owner !== u.id && u.role !== "hr_manager")
+    return false;
+  if (u.role === "hr_manager") return true;
+  if (u.role === "it_manager" && r.department === "IT") return true;
+  if (r.owner === u.id) return true;
+  const projectId = recordType === "Projects" ? r.id : r.project || (r.type ? undefined : r.target);
+  if (projectId && ["Projects", "Tasks", "Documents"].includes(recordType)) {
+    const project = db().prepare("SELECT owner,data FROM records WHERE id=? AND type='Projects'").get(projectId) as { owner: string; data: string } | undefined;
+    if (project) {
+      const projectData = JSON.parse(project.data) as { members?: string[] };
+      const isMember = project.owner === u.id || (projectData.members || []).includes(u.id);
+      const ownerProfile = db().prepare("SELECT data FROM records WHERE id=? AND type='People'").get(project.owner) as { data: string } | undefined;
+      const isManager = ownerProfile && (JSON.parse(ownerProfile.data) as { managerId?: string }).managerId === u.id;
+      if (isMember || (u.role === "manager" && isManager)) return true;
+    }
+  }
+  if (u.role === "manager" && r.type === "People") {
+    const profile = r.data;
+    const person = r.id ? db().prepare("SELECT department FROM employees WHERE id=?").get(r.id) as { department: string } | undefined : undefined;
+    return profile?.managerId === u.id || person?.department === u.department;
+  }
+  if (recordType === "People" || recordType === "Teams") return r.department === u.department;
+  if (recordType === "Documents") return r.department === "Company" || r.department === u.department;
+  if (recordType === "IT") return u.role === "manager" || r.department === u.department;
+  return false;
 }
 export function records(u: Employee) {
   return (
@@ -92,7 +114,9 @@ export function documents(u: Employee): DocumentItem[] {
       .prepare("SELECT * FROM documents ORDER BY rowid DESC")
       .all() as unknown as Omit<DocumentItem, "versions">[]
   )
-    .filter((d) => canRead(u, d))
+    .filter((d) => canRead(u, d) || Boolean(
+      db().prepare("SELECT 1 FROM approvals WHERE documentId=? AND reviewerId=? AND status='PENDING_APPROVAL' LIMIT 1").get(d.id, u.id),
+    ))
     .map((d) => ({
       ...d,
       versions: db()
@@ -385,7 +409,7 @@ export function decide(u: Employee, input: unknown) {
     if (
       (a.reviewerId
         ? a.reviewerId !== u.id && u.role !== "admin"
-        : ![a.reviewerRole, "admin"].includes(u.role)) ||
+        : ![a.reviewerRole, "manager", "admin"].includes(u.role)) ||
       u.id === a.requester
     )
       throw new WorkspaceError(
@@ -454,7 +478,7 @@ export function execute(u: Employee, approvalId: string) {
     if (
       (a.reviewerId
         ? a.reviewerId !== u.id && u.role !== "admin"
-        : ![a.reviewerRole, "admin"].includes(u.role)) ||
+        : ![a.reviewerRole, "manager", "admin"].includes(u.role)) ||
       u.id === a.requester
     )
       throw new WorkspaceError("Authorized independent reviewer required", 403);
@@ -659,11 +683,24 @@ export function replacement(u: Employee, id: string) {
 export function snapshot(u: Employee): Snapshot {
   const docs = documents(u);
   const visibleRecords = records(u);
+  const allUsers = db().prepare("SELECT * FROM employees").all() as Employee[];
+  const projectPeers = new Set<string>();
+  for (const row of db().prepare("SELECT owner,data FROM records WHERE type='Projects'").all() as { owner: string; data: string }[]) {
+    const data = JSON.parse(row.data) as { members?: string[] };
+    if (row.owner === u.id || (data.members || []).includes(u.id)) {
+      projectPeers.add(row.owner);
+      (data.members || []).forEach((id) => projectPeers.add(id));
+    }
+  }
+  const visibleUsers = allUsers.filter((person) => {
+    if (["admin", "hr_manager"].includes(u.role)) return true;
+    const profile = db().prepare("SELECT data FROM records WHERE id=? AND type='People'").get(person.id) as { data: string } | undefined;
+    const managerId = profile ? (JSON.parse(profile.data) as { managerId?: string }).managerId : undefined;
+    return person.id === u.id || projectPeers.has(person.id) || (u.role === "manager" && (person.department === u.department || managerId === u.id));
+  });
   const visibleIds = new Set([
     ...visibleRecords.map((r) => r.id),
-    ...(db().prepare("SELECT id FROM employees").all() as { id: string }[]).map(
-      (r) => r.id,
-    ),
+    ...visibleUsers.map((person) => person.id),
     "management",
     "engineering",
     "product",
@@ -683,7 +720,7 @@ export function snapshot(u: Employee): Snapshot {
         a.requester === u.id ||
         (a.reviewerId
           ? a.reviewerId === u.id || u.role === "admin"
-          : [a.reviewerRole, "admin"].includes(u.role)),
+          : [a.reviewerRole, "manager", "admin"].includes(u.role)),
     )
     .filter((a) => docs.some((d) => d.id === a.documentId));
   for (const approval of approvals) visibleIds.add(approval.id);
@@ -699,9 +736,7 @@ export function snapshot(u: Employee): Snapshot {
   }));
   return {
     user: u,
-    users: (
-      db().prepare("SELECT * FROM employees").all() as unknown as Employee[]
-    ).map((r) => ({
+    users: visibleUsers.map((r) => ({
       ...r,
       leaveBalance:
         r.id === u.id || ["admin", "hr_manager"].includes(u.role)
@@ -893,7 +928,7 @@ export function updateITRecord(u: Employee, input: unknown) {
     const incident = getRecord(u, v.id);
     if (incident.type !== "IT" || incident.data.category !== "Incident")
       throw new WorkspaceError("Incident not found", 404);
-    const manager = ["admin", "it_manager"].includes(u.role);
+    const manager = ["admin", "manager", "it_manager"].includes(u.role);
     if (!manager && incident.owner !== u.id)
       throw new WorkspaceError(
         "Only the assigned employee or an IT manager can update this incident",

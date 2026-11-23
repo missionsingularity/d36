@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --project tsconfig.check.json --noEmit",
-    "test": "tsx --test tests/enterprise.test.ts tests/gemini.test.ts tests/work-engine.test.ts tests/supabase-status.test.ts",
+    "test": "tsx --test tests/enterprise.test.ts tests/gemini.test.ts tests/work-engine.test.ts tests/supabase-status.test.ts tests/auth.test.ts",
     "test:e2e": "playwright test --config playwright.enterprise.config.ts",
     "seed": "tsx scripts/enterprise-seed.ts",
     "test:legacy": "tsx --test tests/engine.test.ts tests/grievances.test.ts tests/guided-demo.test.ts tests/workflow-templates.test.ts tests/demo-world.test.ts tests/sqlite-store.test.ts tests/realistic-scenarios.test.ts tests/legacy-systems.test.ts tests/run-policy.test.ts tests/work-completion.test.ts",
