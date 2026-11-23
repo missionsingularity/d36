@@ -27,6 +27,7 @@ The browser test process needed a temporary ignored Node preload because this ho
 - Removed provider/model terminology and key setup controls from user-facing Settings, assistant messages, and Work mode. Server-side provider configuration remains an administrator/deployment concern; provider failures are shown in plain language.
 - Added a zoomable, collapsible organization chart based on saved reporting relationships and project-scoped task editing (assignee, priority, due date, title and details) with stale-update checking, assignment notification and audit entry.
 - TypeScript and production build passed after these changes. Unit and legacy suites pass when launched with a temporary, ignored Node preload that works around this host's `os.userInfo()` `ENOMEM` error; the workaround is not committed.
+- Regression coverage for project manager edits and stale task updates was added. The enterprise suite passed 42/42, the legacy suite passed 60/60, and TypeScript passed. All six browser tests displayed `ok`; Playwright then hung during Windows server cleanup, so its process was interrupted before a final exit summary.
 - The deployed Supabase check returned a reachable PostgreSQL URL and configured Supabase API credentials. This verifies connectivity only. SQLite remains the authoritative application database and `/tmp` remains ephemeral; Supabase data migration, employee login, private persistent file storage, and hosted deployment validation are outstanding.
 
 | Requirement | Status | Findings and remaining work |
