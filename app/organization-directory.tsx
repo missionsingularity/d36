@@ -47,6 +47,7 @@ export default function OrganizationDirectory({
   const [collapsedPeople, setCollapsedPeople] = useState<Set<string>>(
     new Set(),
   );
+  const [chartZoom, setChartZoom] = useState(1);
   const profiles = new Map(
     data.records
       .filter((record) => record.type === "People")
@@ -158,7 +159,7 @@ export default function OrganizationDirectory({
     const collapsed = collapsedPeople.has(person.id);
     return (
       <div className="org-tree-node" key={person.id}>
-        <div className="org-hierarchy-row" style={{ marginLeft: depth * 22 }}>
+        <div className="org-hierarchy-row">
           <button
             className="org-tree-toggle"
             aria-label={`${collapsed ? "Expand" : "Collapse"} reports for ${person.name}`}
@@ -204,11 +205,15 @@ export default function OrganizationDirectory({
           </button>
           <span className="org-tree-manager">
             {manager ? `Reports to ${manager.name}` : "Organisation lead"}
+            {reportCount.get(person.id) ? ` · ${reportCount.get(person.id)} direct reports` : ""}
           </span>
-          <small>{reportCount.get(person.id) || 0} reports</small>
         </div>
         {!collapsed &&
-          reports.map((report) => renderHierarchy(report, depth + 1, nextPath))}
+          reports.length > 0 && (
+            <div className="org-chart-children">
+              {reports.map((report) => renderHierarchy(report, depth + 1, nextPath))}
+            </div>
+          )}
       </div>
     );
   };
@@ -236,7 +241,7 @@ export default function OrganizationDirectory({
           </p>
         </div>
         <div className="org-header-actions">
-          <span className="org-sample-label">Fictional evaluation records</span>
+          <span className="org-sample-label">Workspace directory</span>
           <button className="text-button" onClick={onRequestLeave}>
             Request leave · {data.user.leaveBalance} days available
           </button>
@@ -439,19 +444,26 @@ export default function OrganizationDirectory({
 
       {tab === "Organisation" && (
         <section className="org-hierarchy">
-          <h2>Reporting lines</h2>
-          <p className="muted">
-            People are grouped by their saved team and manager records.
-          </p>
-          {filtered
-            .filter(
-              (person) =>
-                !person.profile.managerId ||
-                !filtered.some(
-                  (candidate) => candidate.id === person.profile.managerId,
-                ),
-            )
-            .map((person) => renderHierarchy(person, 0))}
+          <div className="section-heading">
+            <div>
+              <h2>Organisation chart</h2>
+              <p className="muted">Reporting lines from saved workspace profiles.</p>
+            </div>
+            <div className="org-chart-controls">
+              <button onClick={() => setChartZoom((z) => Math.max(0.65, +(z - 0.1).toFixed(2)))} aria-label="Zoom out">−</button>
+              <span>{Math.round(chartZoom * 100)}%</span>
+              <button onClick={() => setChartZoom((z) => Math.min(1.4, +(z + 0.1).toFixed(2)))} aria-label="Zoom in">+</button>
+              <button onClick={() => { setChartZoom(1); setCollapsedPeople(new Set()); }}>Fit / expand</button>
+              <button onClick={() => setCollapsedPeople(new Set(filtered.map((p) => p.id)))}>Collapse all</button>
+            </div>
+          </div>
+          <div className="org-chart-viewport">
+            <div className="org-chart-canvas" style={{ transform: `scale(${chartZoom})`, transformOrigin: "top left" }}>
+              {filtered
+                .filter((person) => !person.profile.managerId || !filtered.some((candidate) => candidate.id === person.profile.managerId))
+                .map((person) => renderHierarchy(person, 0))}
+            </div>
+          </div>
         </section>
       )}
 
@@ -531,8 +543,7 @@ export default function OrganizationDirectory({
             })}
           </div>
           <p className="muted">
-            Project-specific permission controls are not configured in this
-            evaluation workspace.
+            Workspace access follows saved roles, teams and project membership.
           </p>
         </section>
       )}

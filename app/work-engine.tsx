@@ -524,7 +524,7 @@ export default function WorkEngine({
               Execution mode
               <select value={mode} onChange={(e) => setMode(e.target.value)}>
                 <option value="workflow">Workflow · published steps</option>
-                <option value="auto">Auto · Gemini plans the work</option>
+                <option value="auto">Auto · BrahmaGPT plans the work</option>
               </select>
             </label>
             {(agent.config.inputSchema?.fields || []).map((f) => (

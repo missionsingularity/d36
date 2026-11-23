@@ -92,7 +92,7 @@ test("official Gemini SDK validates plans and truthfully records model failures"
           prompt: "Find Alpha",
         });
         assert.equal(run.status, "Failed");
-        assert(run.events.at(-1)?.detail.includes("credentials were rejected"));
+        assert(run.events.at(-1)?.detail.includes("could not authenticate"));
       },
     );
     await t.test(
@@ -205,7 +205,7 @@ test("official Gemini SDK validates plans and truthfully records model failures"
           prompt: "Find Alpha",
         });
         assert.equal(calls, 1);
-        assert(run.events.at(-1)?.detail.includes("billing"));
+        assert(run.events.at(-1)?.detail.includes("not available"));
         assert.equal(
           geminiFailure({ status: 404, message: "Model not found" }).retryable,
           false,
@@ -214,7 +214,7 @@ test("official Gemini SDK validates plans and truthfully records model failures"
           geminiFailure({
             status: 404,
             message: "Model not found",
-          }).message.includes("GEMINI_MODEL"),
+          }).message.includes("temporarily unavailable"),
         );
         const failure = geminiFailure({
           status: 503,

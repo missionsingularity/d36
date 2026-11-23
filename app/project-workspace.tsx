@@ -33,6 +33,7 @@ export default function ProjectWorkspace({
   data,
   busy,
   onTask,
+  onEditTask,
   onOpenRecord,
   onBack,
 }: {
@@ -40,11 +41,13 @@ export default function ProjectWorkspace({
   data: Snapshot;
   busy: boolean;
   onTask: (id: string, status: string) => void;
+  onEditTask: (id: string, fields: Record<string, string>) => void;
   onOpenRecord: (record: RecordItem) => void;
   onBack: () => void;
 }) {
   const [tab, setTab] = useState("Overview");
   const [view, setView] = useState<"Board" | "List">("Board");
+  const [editingTask, setEditingTask] = useState<RecordItem>();
   const records = data.records;
   const tasks = records.filter(
     (record) => record.type === "Tasks" && record.project === project.id,
@@ -95,7 +98,9 @@ export default function ProjectWorkspace({
     [tasks],
   );
   const canUpdate = (task: RecordItem) =>
-    task.owner === data.user.id || data.user.role === "admin";
+    task.owner === data.user.id || canEditTask(task);
+  const canEditTask = (task: RecordItem) =>
+    data.user.role === "admin" || project.owner === data.user.id || (data.relationships || []).some((r) => r.fromId === project.owner && r.toId === data.user.id && r.relation === "REPORTS_TO");
   const taskRow = (task: RecordItem) => (
     <article className="project-task-card" key={task.id}>
       <div className="project-task-top">
@@ -126,16 +131,19 @@ export default function ProjectWorkspace({
         </small>
       )}
       {canUpdate(task) ? (
-        <select
-          aria-label={`Status for ${task.id}`}
-          value={normalized(task.status)}
-          disabled={busy}
-          onChange={(event) => onTask(task.id, event.target.value)}
-        >
-          {taskStatuses.map((status) => (
-            <option key={status}>{status}</option>
-          ))}
-        </select>
+        <div className="project-task-actions">
+          <select
+            aria-label={`Status for ${task.id}`}
+            value={normalized(task.status)}
+            disabled={busy}
+            onChange={(event) => onTask(task.id, event.target.value)}
+          >
+            {taskStatuses.map((status) => (
+              <option key={status}>{status}</option>
+            ))}
+          </select>
+          {canEditTask(task) && <button className="text-button" onClick={() => setEditingTask(task)}>Edit task</button>}
+        </div>
       ) : (
         <span className="project-task-status">{normalized(task.status)}</span>
       )}
@@ -336,6 +344,29 @@ export default function ProjectWorkspace({
             </div>
           ) : (
             <div className="project-task-list">{tasks.map(taskRow)}</div>
+          )}
+          {editingTask && (
+            <form className="task-edit-panel" onSubmit={(event) => {
+              event.preventDefault();
+              const form = new FormData(event.currentTarget);
+              onEditTask(editingTask.id, {
+                title: String(form.get("title") || ""),
+                body: String(form.get("body") || ""),
+                owner: String(form.get("owner") || ""),
+                priority: String(form.get("priority") || "Normal"),
+                due: String(form.get("due") || ""),
+                expectedUpdated: editingTask.updated,
+              });
+              setEditingTask(undefined);
+            }}>
+              <h3>Edit task</h3>
+              <label>Task name<input name="title" defaultValue={editingTask.title} required maxLength={180} /></label>
+              <label>Details<textarea name="body" defaultValue={editingTask.body} maxLength={12000} /></label>
+              <label>Assigned to<select name="owner" defaultValue={editingTask.owner}>{people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
+              <label>Priority<select name="priority" defaultValue={String(editingTask.data.priority || "Normal")}>{["Low", "Normal", "Medium", "High", "Urgent"].map((priority) => <option key={priority}>{priority}</option>)}</select></label>
+              <label>Due date<input name="due" type="date" defaultValue={String(editingTask.data.due || "")} /></label>
+              <div><button type="button" className="secondary-button" onClick={() => setEditingTask(undefined)}>Cancel</button><button className="primary" disabled={busy}>Save task</button></div>
+            </form>
           )}
         </section>
       )}

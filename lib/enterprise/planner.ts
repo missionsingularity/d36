@@ -391,7 +391,7 @@ export async function runChat(u: Employee, input: unknown) {
         uid(),
         chatId,
         "assistant",
-        `${run.mode}\n\n${content}`,
+        content,
         run.id,
         timestamp(),
       );

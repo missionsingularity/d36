@@ -177,7 +177,6 @@ export default function EnterpriseWorkspace() {
     [reason, setReason] = useState(""),
     [versionId, setVersionId] = useState("");
   const [settingsText, setSettingsText] = useState("");
-  const [geminiCheck, setGeminiCheck] = useState("");
   const [csv, setCsv] = useState(
       "id,title,body,department\nlegacy-asset-01,SG-WS-2018 · QA workstation,QA workstation used for browser compatibility checks,IT\nlegacy-asset-02,SG-NAS-04 · Backup storage,Encrypted local backup storage for evaluation records,IT\nlegacy-asset-03,SG-SW-12 · Office network switch,Managed switch serving the engineering lab,IT",
     ),
@@ -1010,13 +1009,6 @@ export default function EnterpriseWorkspace() {
                     <strong>
                       {m.role === "user" ? data.user.name : "BrahmaGPT"}
                     </strong>
-                    {m.role === "assistant" && (
-                      <span className="answer-mode">
-                        {m.text.startsWith("OFFLINE LOCAL MODE")
-                          ? "Offline local mode"
-                          : "Live Gemini"}
-                      </span>
-                    )}
                     {m.role === "assistant" ? (
                       <MessageBody text={visibleMessage} />
                     ) : (
@@ -1075,10 +1067,7 @@ export default function EnterpriseWorkspace() {
                                   onClick={async () => {
                                     try {
                                       await navigator.clipboard.writeText(
-                                        visibleMessage.replace(
-                                          /^(LIVE GEMINI|OFFLINE LOCAL MODE)\s*\n+/,
-                                          "",
-                                        ),
+                                        visibleMessage,
                                       );
                                       setToast("Response copied");
                                     } catch {
@@ -1196,10 +1185,7 @@ export default function EnterpriseWorkspace() {
           <div className="chat-composer">
             {composer()}
             <p>
-              {data.mode === "OFFLINE LOCAL MODE"
-                ? "Offline mode"
-                : "Gemini enabled"}{" "}
-              · Check each answer against its sources.
+              Check each answer against its sources.
             </p>
           </div>
         </div>
@@ -1850,6 +1836,9 @@ export default function EnterpriseWorkspace() {
             busy={busy}
             onTask={(id, status) =>
               act({ action: "task", id, status }, "Task status saved")
+            }
+            onEditTask={(id, fields) =>
+              act({ action: "task", id, ...fields }, "Task updated")
             }
             onOpenRecord={openRecord}
             onBack={() => go("projects")}
@@ -2722,7 +2711,6 @@ export default function EnterpriseWorkspace() {
                 "General",
                 "Appearance",
                 "Usage",
-                "Gemini",
                 "Supabase",
                 "Activity",
               ].map((tab) => (
@@ -2736,8 +2724,6 @@ export default function EnterpriseWorkspace() {
                     <Sun size={16} />
                   ) : tab === "Usage" ? (
                     <Briefcase size={16} />
-                  ) : tab === "Gemini" ? (
-                    <CircleHelp size={16} />
                   ) : tab === "Supabase" ? (
                     <Database size={16} />
                   ) : tab === "Activity" ? (
@@ -2916,62 +2902,6 @@ export default function EnterpriseWorkspace() {
                       <span key={item}>{item}</span>
                     ))}
                   </div>
-                </section>
-              )}
-              {settingsTab === "Gemini" && (
-                <section>
-                  <div className="section-heading">
-                    <h3>Gemini connection</h3>
-                    <Status>{data.mode}</Status>
-                  </div>
-                  <p className="muted">
-                    Your key stays on the server. It is never sent to this
-                    browser.
-                  </p>
-                  <ol className="setup-steps">
-                    <li>
-                      Open{" "}
-                      <code>C:\Users\spond\Singularity\d36\.env.local</code>
-                    </li>
-                    <li>
-                      Add your key after <code>GEMINI_API_KEY=</code>
-                    </li>
-                    <li>
-                      Restart the app with <code>npm.cmd run dev</code>
-                    </li>
-                  </ol>
-                  <p>
-                    Model: <code>{data.model}</code>. Set{" "}
-                    <code>GEMINI_MODEL</code> in the same file to change it.
-                  </p>
-                  <button
-                    disabled={busy || data.user.role !== "admin"}
-                    onClick={async () => {
-                      setGeminiCheck("");
-                      try {
-                        const result = await post({ action: "testGemini" });
-                        setGeminiCheck(
-                          `Connected to ${result.model} in ${result.elapsedMs} ms.`,
-                        );
-                      } catch {
-                        setGeminiCheck(
-                          "Connection failed. See the message above for the fix.",
-                        );
-                      }
-                    }}
-                  >
-                    Test Gemini connection
-                  </button>
-                  {geminiCheck && (
-                    <p role="status" className="muted">
-                      {geminiCheck}
-                    </p>
-                  )}
-                  <p className="muted">
-                    Without a key, local search, predefined workflows,
-                    documents, and authorized approvals work in offline local
-                    mode.
-                  </p>
                 </section>
               )}
               {settingsTab === "Supabase" && (

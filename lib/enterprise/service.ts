@@ -808,20 +808,42 @@ export function updateTask(u: Employee, input: unknown) {
         "Review",
         "Blocked",
         "Cancelled",
-      ]),
+      ]).optional(),
+      title: z.string().trim().min(3).max(180).optional(),
+      body: z.string().trim().max(12000).optional(),
+      owner: text.optional(),
+      priority: z.enum(["Low", "Normal", "Medium", "High", "Urgent"]).optional(),
+      due: z.string().max(40).optional(),
+      expectedUpdated: z.string().optional(),
     })
     .parse(input);
   return atomic(() => {
     const t = getRecord(u, v.id);
-    if (t.type !== "Tasks" || (t.owner !== u.id && u.role !== "admin"))
-      throw new WorkspaceError("Only the owner can update this task", 403);
+    if (t.type !== "Tasks") throw new WorkspaceError("Task not found", 404);
+    const project = t.project ? getRecord(u, t.project) : undefined;
+    const projectManager = project ? db().prepare("SELECT toId FROM relationships WHERE fromId=? AND relation='MANAGED_BY' ORDER BY rowid LIMIT 1").get(project.id) as { toId: string } | undefined : undefined;
+    const profile = project ? db().prepare("SELECT data FROM records WHERE id=? AND type='People'").get(project.owner) as { data: string } | undefined : undefined;
+    const profileManager = profile ? (JSON.parse(profile.data) as { managerId?: string }).managerId : undefined;
+    const managerId = projectManager?.toId || profileManager;
+    const manager = u.role === "admin" || (!!project && (project.owner === u.id || managerId === u.id));
+    const assignee = v.owner ? employee(v.owner) : undefined;
+    if (assignee && project && !((project.data.members as string[] | undefined) || []).includes(assignee.id) && assignee.id !== project.owner)
+      throw new WorkspaceError("Assign this task to a member of its project", 400);
+    if (v.expectedUpdated && v.expectedUpdated !== t.updated)
+      throw new WorkspaceError("This task changed since you opened it. Refresh and try again.", 409);
+    if (v.status && t.owner !== u.id && !manager)
+      throw new WorkspaceError("Only the task owner or project manager can change its status", 403);
+    const editingDetails = !!(v.title || v.body || v.owner || v.priority || v.due !== undefined);
+    if (editingDetails && !manager)
+      throw new WorkspaceError("Only the project manager can edit task details", 403);
+    if (!v.status && !editingDetails) throw new WorkspaceError("No task changes were supplied", 400);
     const current =
       t.status.toLowerCase() === "open"
         ? "To Do"
         : t.status.toLowerCase() === "in progress"
           ? "In Progress"
           : t.status;
-    if (["Done", "Cancelled"].includes(current) && current !== v.status)
+    if (v.status && ["Done", "Cancelled"].includes(current) && current !== v.status)
       throw new WorkspaceError(
         "A completed or cancelled task cannot be reopened. Create a follow-up task instead.",
         409,
@@ -833,13 +855,20 @@ export function updateTask(u: Employee, input: unknown) {
       )
     )
       throw new WorkspaceError("Complete task dependencies first", 409);
-    db()
-      .prepare("UPDATE records SET status=?,updated=? WHERE id=?")
-      .run(v.status, timestamp(), t.id);
-    log(u.id, "Task status updated", t.id + ": " + v.status);
+    const data = { ...t.data };
+    if (v.priority) data.priority = v.priority;
+    if (v.due !== undefined) data.due = v.due;
+    const nextStatus = v.status || t.status;
+    const nextOwner = assignee?.id || t.owner;
+    const nextTitle = v.title || t.title;
+    const nextBody = v.body ?? t.body;
+    db().prepare("UPDATE records SET title=?,body=?,owner=?,status=?,updated=?,data=? WHERE id=?")
+      .run(nextTitle, nextBody, nextOwner, nextStatus, timestamp(), JSON.stringify(data), t.id);
+    log(u.id, editingDetails ? "Task details updated" : "Task status updated", t.id + ": " + nextStatus);
+    if (nextOwner !== t.owner) notify(nextOwner, `You were assigned: ${nextTitle}`);
     const reporter = t.data.reporter;
     if (typeof reporter === "string" && reporter !== u.id)
-      notify(reporter, `${t.title}: status changed to ${v.status}`);
+      notify(reporter, `${t.title}: status changed to ${nextStatus}`);
   });
 }
 export function updateITRecord(u: Employee, input: unknown) {

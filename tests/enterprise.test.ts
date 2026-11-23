@@ -177,6 +177,29 @@ test("enterprise scenarios, permissions, exact versions and receipts", async (t)
       );
     },
   );
+  await t.test("project manager can edit task details with stale-write protection", () => {
+    const manager = maya;
+    const before = snapshot(maya).records.find((record) => record.id === "task-2")!;
+    updateTask(manager, {
+      id: before.id,
+      expectedUpdated: before.updated,
+      title: "Review retrieval quality with the product team",
+      priority: "High",
+      due: "2026-12-10",
+    });
+    const after = snapshot(maya).records.find((record) => record.id === before.id)!;
+    assert.equal(after.title, "Review retrieval quality with the product team");
+    assert.equal(after.data.priority, "High");
+    assert.equal(after.data.due, "2026-12-10");
+    assert.throws(
+      () => updateTask(manager, { id: before.id, status: "Review", expectedUpdated: before.updated }),
+      /changed since you opened it/,
+    );
+    assert.throws(
+      () => updateTask(employee("noah"), { id: before.id, title: "Edit another owner's task" }),
+      /project manager/,
+    );
+  });
   await t.test(
     "6-7. template document revision, immutability, return comments and stale approvals",
     () => {

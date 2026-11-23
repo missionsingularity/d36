@@ -20,32 +20,32 @@ export function geminiFailure(error: unknown) {
       raw,
     );
   let message =
-    "Gemini could not complete this request. Please retry. Local search and saved approvals remain available.";
+    "BrahmaGPT could not complete this request. Please retry. Local search and saved approvals remain available.";
   if (/billing|paid tier|free tier|project.unavailable/i.test(raw))
     message =
-      "This Google project requires Gemini billing to be enabled in Google AI Studio.";
+      "The assistant service is not available for this workspace. Ask an administrator to check the service setup.";
   else if (status === 401 || status === 403 || /api.?key|credential/i.test(raw))
     message =
-      "Gemini credentials were rejected. Check GEMINI_API_KEY and project access in .env.local.";
+      "The assistant service could not authenticate. Ask an administrator to check the server connection.";
   else if (status === 404 || /model.*not found|no longer available/i.test(raw))
     message =
-      "The configured Gemini model is unavailable. Update GEMINI_MODEL in .env.local and restart the app.";
+      "The assistant service is temporarily unavailable. Please try again later.";
   else if (status === 429)
     message =
-      "Gemini quota or rate limit reached. Retry later or check your Google project quota.";
+      "The assistant service is busy. Please wait a moment and try again.";
   else if (
     status === 504 ||
     status === 408 ||
     /deadline|timeout|timed out|abort/i.test(raw)
   )
     message =
-      "Gemini took too long to respond. Please retry. Local search and saved approvals remain available.";
+      "BrahmaGPT took too long to respond. Please retry. Local search and saved approvals remain available.";
   else if (status === 503 || /high demand|overload/i.test(raw))
     message =
-      "Gemini is temporarily busy. Please retry shortly. Local search and saved approvals remain available.";
+      "BrahmaGPT is temporarily busy. Please retry shortly. Local search and saved approvals remain available.";
   else if (/fetch|network|ENOTFOUND|ECONNRESET/i.test(raw))
     message =
-      "Gemini could not be reached. Local search and saved approvals remain available.";
+      "BrahmaGPT could not be reached. Local search and saved approvals remain available.";
   return {
     message,
     retryable:

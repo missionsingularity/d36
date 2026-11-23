@@ -22,6 +22,13 @@ The browser test process needed a temporary ignored Node preload because this ho
 
 ## Current implementation status
 
+## Enterprise workspace repair pass (2026-11-24)
+
+- Removed provider/model terminology and key setup controls from user-facing Settings, assistant messages, and Work mode. Server-side provider configuration remains an administrator/deployment concern; provider failures are shown in plain language.
+- Added a zoomable, collapsible organization chart based on saved reporting relationships and project-scoped task editing (assignee, priority, due date, title and details) with stale-update checking, assignment notification and audit entry.
+- TypeScript and production build passed after these changes. Unit and legacy suites pass when launched with a temporary, ignored Node preload that works around this host's `os.userInfo()` `ENOMEM` error; the workaround is not committed.
+- The deployed Supabase check returned a reachable PostgreSQL URL and configured Supabase API credentials. This verifies connectivity only. SQLite remains the authoritative application database and `/tmp` remains ephemeral; Supabase data migration, employee login, private persistent file storage, and hosted deployment validation are outstanding.
+
 | Requirement | Status | Findings and remaining work |
 |---|---|---|
 | Local workspace, search and citations | Working locally | Next App Router provides `/api/workspace` and `/api/work-engine`; SQLite FTS5 supports search, and source previews use bundled source packs. Home search now supports keyboard focus and a direct handoff to chat. |
@@ -33,15 +40,15 @@ The browser test process needed a temporary ignored Node preload because this ho
 | Gemini | Implemented; provider unavailable in smoke test | Server-side SDK, structured plans, tool validation and bounded retries exist. The current live key/model did not complete the connectivity check. No Gemini key is configured for Vercel in this workspace. |
 | Authentication | Not production-ready | Vercel currently issues a virtual, read-only `Public Preview` viewer so the bundled sample workspace can open. This is not employee authentication. Local demo persona switching is isolated behind `DEMO_MODE`; a real identity provider, login/logout and session lifecycle remain unconfigured. |
 | Resource permissions | Partial; not sufficient for production | Read/write guards, HR restrictions, reviewer checks and agent scopes exist, but resource classification, project/team access, relationship traversal and all sensitive routes need a full authorization audit before real data is used. |
-| Vercel database durability | Missing; Supabase probe added | Vercel mode writes SQLite under a writable temporary directory to avoid the `/var/task/.data` startup error. `/api/supabase/status` now runs `SELECT 1` when `POSTGRES_URL` or `POSTGRES_PRISMA_URL` is configured, but the application data layer has not been migrated and the connection variables are not available in this workspace. |
+| Vercel database durability | Supabase connectivity confirmed; application migration outstanding | The deployed `/api/supabase/status` returned `configured:true`, `connected:true`, `connectionVariable:"POSTGRES_URL"`, and `supabaseApiConfigured:true`. This confirms database reachability only. Vercel mode still writes SQLite under a writable temporary directory; the application has not switched to PostgreSQL. |
 | Private file storage | Missing | Source packs are bundled, but uploads/generated files do not use a private persistent object-storage service. |
 | Vercel project/deployment | Blocked by external access | No linked `.vercel/project.json`, Vercel CLI/token, or deployment credentials are available. The deployment was not changed or verified. |
-| Gemini, multi-user and redeploy acceptance | Not passed | Live Gemini failed; no hosted database, persistent object storage or real sign-in provider is configured, so cross-user and redeploy survival cannot pass yet. |
+| Gemini, multi-user and redeploy acceptance | Not passed | Live Gemini failed; Supabase is reachable but not used by workspace data. Persistent object storage and real sign-in provider remain unconfigured, so cross-user and redeploy survival cannot pass yet. |
 
 ## External setup needed for production
 
 1. Connect the existing Vercel project and provide deployment access for `missionsingularity/d36`.
-2. Select and configure a managed persistent database. The current synchronous `better-sqlite3` layer and FTS5 are not a drop-in match for hosted PostgreSQL/Turso clients; choose a compatible adapter and migrate with backups while preserving IDs and history.
+2. Migrate the current synchronous `better-sqlite3` layer and FTS5 to a PostgreSQL-compatible data layer. Supabase is reachable through `POSTGRES_URL`; migrate with backups while preserving IDs and history, and test all services against PostgreSQL before routing live traffic to it.
 3. Configure private object storage and migrate/reconcile generated files and uploads.
 4. Configure an identity provider and server-side secrets; decide whether the public read-only preview remains enabled.
 5. Set `GEMINI_API_KEY` and `GEMINI_MODEL` as server-only Vercel variables, then run a live request against that deployed project.
