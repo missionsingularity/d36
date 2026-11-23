@@ -148,20 +148,72 @@ async function parseAuthError(response: Response) {
   return new Error("Sign in is temporarily unavailable. Please try again later.");
 }
 export async function authStatus() {
-  await ensureSchema();
-  const sql = getSql();
-  const rows = await sql`SELECT user_id FROM public.brahma_auth_setup WHERE id=true`;
+  const hasPostgresUrl = Boolean(process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL);
+  const hasSupabaseUrl = Boolean(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const hasServerKey = Boolean(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const hasSetupToken = Boolean(process.env.BRAHMA_FIRST_ADMIN_SETUP_TOKEN);
+  const hasEncryptionKey = Boolean(process.env.BRAHMA_SESSION_ENCRYPTION_KEY);
   const hasPublicKey = Boolean(
     process.env.SUPABASE_PUBLISHABLE_KEY ||
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       process.env.SUPABASE_ANON_KEY,
   );
-  return {
-    configured: true,
-    setupAvailable: rows.length === 0 && Boolean(process.env.BRAHMA_FIRST_ADMIN_SETUP_TOKEN) && hasPublicKey && Boolean(process.env.BRAHMA_SESSION_ENCRYPTION_KEY),
+  const flags = {
+    postgresConfigured: hasPostgresUrl,
+    supabaseUrlConfigured: hasSupabaseUrl,
     publishableKeyConfigured: hasPublicKey,
-    sessionEncryptionConfigured: Boolean(process.env.BRAHMA_SESSION_ENCRYPTION_KEY),
+    serverAuthKeyConfigured: hasServerKey,
+    setupTokenConfigured: hasSetupToken,
+    sessionEncryptionConfigured: hasEncryptionKey,
   };
+  const missingLoginConfiguration = [
+    !hasPostgresUrl && "POSTGRES_URL",
+    !hasSupabaseUrl && "SUPABASE_URL",
+    !hasPublicKey && "SUPABASE_PUBLISHABLE_KEY",
+    !hasEncryptionKey && "BRAHMA_SESSION_ENCRYPTION_KEY",
+  ].filter((value): value is string => Boolean(value));
+  if (!hasPostgresUrl) {
+    return {
+      configured: false,
+      setupAvailable: false,
+      setupCompleted: false,
+      missingLoginConfiguration,
+      missingSetupConfiguration: [],
+      ...flags,
+      message: "Supabase login storage is not configured.",
+    };
+  }
+  try {
+    await ensureSchema();
+    const rows = await getSql()`SELECT user_id FROM public.brahma_auth_setup WHERE id=true`;
+    const setupCompleted = rows.length > 0;
+    const missingSetupConfiguration = [
+      !hasServerKey && "SUPABASE_SECRET_KEY",
+      !hasSetupToken && "BRAHMA_FIRST_ADMIN_SETUP_TOKEN",
+    ].filter((value): value is string => Boolean(value));
+    return {
+      configured: true,
+      setupAvailable:
+        !setupCompleted &&
+        missingLoginConfiguration.length === 0 &&
+        missingSetupConfiguration.length === 0,
+      setupCompleted,
+      missingLoginConfiguration,
+      missingSetupConfiguration,
+      ...flags,
+    };
+  } catch (error) {
+    console.error("[BrahmaGPT Auth] Supabase login storage check failed", error);
+    return {
+      configured: false,
+      setupAvailable: false,
+      setupCompleted: false,
+      missingLoginConfiguration,
+      missingSetupConfiguration: [],
+      ...flags,
+      message: "Supabase login storage is not reachable. Check POSTGRES_URL and the Supabase database connection.",
+    };
+  }
 }
 export async function setupFirstAdmin(input: {
   setupToken: string;

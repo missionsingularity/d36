@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { NextRequest } from "next/server";
+import { GET as authGET } from "../app/api/auth/route";
 import { GET as workspaceGET, POST as workspacePOST } from "../app/api/workspace/route";
 import { GET as engineGET, POST as enginePOST } from "../app/api/work-engine/route";
 import { GET as supabaseGET } from "../app/api/supabase/status/route";
@@ -22,4 +23,15 @@ test("workspace APIs require an authenticated session before reading or writing"
     method: "POST", headers, body: JSON.stringify({ action: "launch" }),
   }));
   assert.equal(engineWrite.status, 401);
+});
+
+test("auth status reports safe setup flags without exposing secrets", async () => {
+  const response = await authGET(new NextRequest("https://d36.example/api/auth"));
+  assert.equal(response.status, 200);
+  const status = await response.json();
+  assert.equal(status.authenticated, false);
+  assert.equal(typeof status.setupAvailable, "boolean");
+  assert.equal(Array.isArray(status.missingLoginConfiguration), true);
+  assert.equal("SUPABASE_SECRET_KEY" in status, false);
+  assert.equal("BRAHMA_SESSION_ENCRYPTION_KEY" in status, false);
 });

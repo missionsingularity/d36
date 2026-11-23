@@ -15,9 +15,11 @@ export default function LoginPanel({ setupAvailable: initialSetup, onLogin }: Pr
     fetch("/api/auth", { cache: "no-store" }).then((response) => response.json())
       .then((result) => {
         setSetupAvailable(Boolean(result.setupAvailable));
-        if (result.error) setServiceNote(result.error);
-        else if (!result.publishableKeyConfigured) setServiceNote("Add SUPABASE_PUBLISHABLE_KEY to the Vercel project to enable sign-in.");
-        else if (!result.sessionEncryptionConfigured) setServiceNote("Add BRAHMA_SESSION_ENCRYPTION_KEY to securely store login sessions.");
+        if (result.missingLoginConfiguration?.length) {
+          setServiceNote(`Set these server environment variables to enable sign-in: ${result.missingLoginConfiguration.join(", ")}.`);
+        } else if (!result.setupCompleted && result.missingSetupConfiguration?.length) {
+          setServiceNote(`First-admin setup still needs: ${result.missingSetupConfiguration.join(", ")}.`);
+        } else if (result.message) setServiceNote(result.message);
       })
       .catch(() => undefined);
   }, []);
