@@ -13,6 +13,12 @@ import {
   dataDirectory,
 } from "@/lib/enterprise/db";
 import {
+  identity,
+  PUBLIC_VIEWER_TOKEN,
+  publicViewerIdentity,
+  requireWorkspaceWriteAccess,
+} from "@/lib/enterprise/auth";
+import {
   employee,
   snapshot,
   search,
@@ -165,15 +171,6 @@ async function renderDocument(
     };
   }
   throw new WorkspaceError("Unsupported document format", 400);
-}
-function identity(req: NextRequest) {
-  const token = req.cookies.get("singularity-session")?.value;
-  const session = token
-    ? (db()
-        .prepare("SELECT userId FROM sessions WHERE token=? AND expires>?")
-        .get(token, Date.now()) as { userId: string } | undefined)
-    : undefined;
-  return session ? employee(session.userId as string) : undefined;
 }
 function failure(e: unknown) {
   return NextResponse.json(
@@ -358,11 +355,16 @@ export async function GET(req: NextRequest) {
     let u = identity(req);
     let token: string | undefined;
     if (!u) {
-      u = employee("maya");
-      token = uid();
-      db()
-        .prepare("INSERT INTO sessions VALUES(?,?,?)")
-        .run(token, u.id, Date.now() + 86400000);
+      if (process.env.VERCEL === "1") {
+        u = publicViewerIdentity();
+        token = PUBLIC_VIEWER_TOKEN;
+      } else {
+        u = employee("maya");
+        token = uid();
+        db()
+          .prepare("INSERT INTO sessions VALUES(?,?,?)")
+          .run(token, u.id, Date.now() + 86400000);
+      }
     }
     const url = req.nextUrl;
     let response: NextResponse;
@@ -546,6 +548,7 @@ export async function POST(req: NextRequest) {
         "Reload the workspace to establish a local session",
         401,
       );
+    requireWorkspaceWriteAccess(u);
     const body = await req.json();
     if (!body || typeof body.action !== "string")
       throw new WorkspaceError("Action required");
@@ -557,7 +560,7 @@ export async function POST(req: NextRequest) {
         result = await testGeminiConnection();
         break;
       case "switchUser": {
-        if (process.env.DEMO_MODE !== "true")
+        if (process.env.VERCEL === "1" || process.env.DEMO_MODE !== "true")
           throw new WorkspaceError("Persona switching is disabled", 403);
         const next = employee(z.string().parse(body.id));
         db()

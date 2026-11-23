@@ -19,7 +19,7 @@ test("agent launch, durable artifacts, builder publishing and local schedule", a
   await page.getByRole("button", { name: "Artifacts", exact: true }).click();
   await expect(page.getByRole("link", { name: "Open document" })).toBeVisible();
   await page.screenshot({ path: ".qa/engine-artifacts.png", fullPage: true });
-  await page.goto("/settings");
+  await page.goto("/profile");
   await page
     .getByRole("combobox", { name: "Active employee" })
     .selectOption("sam");
@@ -33,6 +33,11 @@ test("agent launch, durable artifacts, builder publishing and local schedule", a
   await page
     .getByLabel("Instructions", { exact: true })
     .fill("Find Alpha records and return sources");
+  await page
+    .getByLabel("Workflow steps, dependencies and branch conditions (JSON)")
+    .fill(
+      '[{"id":"search","tool":"search_records","arguments":{"query":"Alpha"},"dependsOn":[],"approvalPolicy":"none"}]',
+    );
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("version 1 saved");
   await page

@@ -68,6 +68,7 @@ export function db() {
   const configuredDataDir = process.env.BRAHMA_DATA_DIR;
   const usesDefaultWorkspace =
     process.env.VERCEL === "1" ||
+    process.env.DEMO_MODE === "true" ||
     !configuredDataDir ||
     path.resolve(configuredDataDir) === path.resolve(".data");
   if (usesDefaultWorkspace) ensureOrganizationDirectory(c);

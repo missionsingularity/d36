@@ -27,6 +27,8 @@ export const planSchema = z
   .strict();
 export function localPlan(prompt: string) {
   const q = prompt.toLowerCase();
+  const projectName = q.match(/\b(alpha|beta|gamma|delta|epsilon|atlas)\b/)?.[1];
+  const projectId = projectName || "alpha";
   if (/replace|replacement|laptop/.test(q))
     return {
       steps: [
@@ -43,7 +45,11 @@ export function localPlan(prompt: string) {
   if (/report|progress/.test(q))
     return {
       steps: [
-        { tool: "calculate_project_progress", resourceId: "alpha" },
+        {
+          tool: "search_records",
+          query: `${projectName || "Alpha"} report`,
+        },
+        { tool: "calculate_project_progress", resourceId: projectId },
         { tool: "create_document_draft" },
         ...(/approval|approve|send|manager/.test(q)
           ? [

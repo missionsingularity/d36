@@ -28,13 +28,13 @@ test("primary workflow, exact approval, exports, search, persistence and visual 
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: /Good .*Maya/ }),
+    page.getByRole("heading", { name: "Start your day with BrahmaGpt" }),
   ).toBeVisible();
   await page.screenshot({ path: screen + "/home.png", fullPage: true });
   await page
     .getByRole("textbox", { name: "Ask a question or describe a task" })
     .fill(
-      "Find unresolved laptop issues affecting Project Alpha, check the replacement policy, prepare requests and send to the IT Manager for approval.",
+      "Find the latest Alpha project report, compare it with current tasks, identify delays, prepare an updated weekly report and send the draft to my manager for approval.",
     );
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page).toHaveURL(/\/chat\//);
@@ -55,13 +55,15 @@ test("primary workflow, exact approval, exports, search, persistence and visual 
       .evaluate((el) => el.getBoundingClientRect().right),
   ).toBeLessThanOrEqual(1061);
   await page.getByRole("button", { name: "Close sources panel" }).click();
-  await page.getByRole("button", { name: "Open in Work", exact: true }).click();
+  await page
+    .getByRole("button", { name: "View Workflow Details", exact: true })
+    .click();
   await expect(page.locator(".timeline li")).toHaveCount(5);
   await page.screenshot({ path: screen + "/work.png", fullPage: true });
   await page.getByRole("button", { name: /Open saved draft/ }).click();
   await expect(
     page.getByRole("textbox", { name: "Document content" }),
-  ).toContainText("Laptop replacement request");
+  ).toContainText("Alpha · progress report");
   const docUrl = page.url();
   await page.screenshot({
     path: screen + "/document-editor.png",
@@ -80,33 +82,46 @@ test("primary workflow, exact approval, exports, search, persistence and visual 
     );
   }
   await page.goto("/approvals");
-  await expect(page.locator(".approval-card")).toHaveCount(1);
+  const reportApproval = page
+    .locator(".approval-card")
+    .filter({ hasText: "Project report" });
+  await expect(reportApproval).toHaveCount(1);
   await expect(
-    page.getByRole("button", { name: /Approve version/ }),
+    reportApproval.getByRole("button", { name: /Approve version/ }),
   ).toHaveCount(0);
   await page.screenshot({ path: screen + "/approvals.png", fullPage: true });
-  await page.goto("/settings");
+  await page.goto("/profile");
   await page
     .getByRole("combobox", { name: "Active employee" })
-    .selectOption("arjun");
-  await expect(page.locator(".profile-button")).toContainText("Arjun");
+    .selectOption("marcus-reed");
+  await expect(page.locator(".profile-button")).toContainText("Marcus");
   await page.goto("/approvals");
-  await page.getByRole("button", { name: "Approve version 1" }).click();
+  await reportApproval.getByRole("button", { name: /Approve version/ }).click();
+  await page
+    .getByRole("textbox", { name: "Reason for approval" })
+    .fill("Reviewed the exact version and its linked evidence.");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: /^Approved/ }).click();
   await expect(
     page.getByRole("button", { name: "Execute approved action" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Execute approved action" }).click();
   await expect(page.locator(".receipt")).toContainText(
-    "No external order sent",
+    "Exact document version approved and released in the local workspace",
   );
   await page.reload();
-  await expect(page.locator(".receipt")).toContainText("Replacement ordered");
+  await page.getByRole("button", { name: /^Approved/ }).click();
+  await expect(page.locator(".receipt")).toContainText(
+    "Exact document version approved and released in the local workspace",
+  );
   await page.goto("/search");
   await expect(
     page.getByRole("searchbox", { name: "Search across Singularity" }),
   ).toBeVisible();
   await page.screenshot({ path: screen + "/search.png", fullPage: true });
-  await page.locator("#enterprise-search").fill("Alpha");
+  await page
+    .getByRole("searchbox", { name: "Search across Singularity" })
+    .fill("Alpha");
   await expect(page.locator(".result-row").first()).toBeVisible();
   await page
     .getByRole("button", { name: "Documents", exact: true })
@@ -138,13 +153,19 @@ test("primary workflow, exact approval, exports, search, persistence and visual 
       ),
     ).toBe(false);
   }
-  await page.getByRole("button", { name: "Dark", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Appearance", exact: true })
+    .click();
+  await page.getByRole("button", { name: /^Dark/ }).click();
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.goto("/");
   await page.screenshot({ path: screen + "/dark.png", fullPage: true });
   await page.goto("/settings");
-  await page.getByRole("button", { name: "Light", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Appearance", exact: true })
+    .click();
+  await page.getByRole("button", { name: /^Light/ }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Good/ })).toBeVisible();
@@ -198,10 +219,12 @@ test("new document, revision, project team, leave and import via UI", async ({
   await expect(
     page.getByRole("heading", { name: "Browser launch" }),
   ).toBeVisible();
-  await expect(page.locator(".team-list")).toContainText("Noah");
+  await expect(page.locator(".project-overview-columns")).toContainText(
+    "Noah",
+  );
   await page.goto("/hr");
   await page
-    .getByRole("button", { name: "Request leave", exact: true })
+    .getByRole("button", { name: /Request leave/ })
     .click();
   await page.getByLabel("First day").fill("2026-12-14");
   await page.getByLabel("Last day").fill("2026-12-15");
@@ -216,7 +239,7 @@ test("new document, revision, project team, leave and import via UI", async ({
   await expect(page.locator(".document-context")).toContainText(
     "pending approval",
   );
-  await page.goto("/settings");
+  await page.goto("/profile");
   await page
     .getByRole("combobox", { name: "Active employee" })
     .selectOption("sam");
@@ -227,7 +250,7 @@ test("new document, revision, project team, leave and import via UI", async ({
     .click();
   await page.getByRole("button", { name: "Validate & preview" }).click();
   await expect(page.locator(".import-preview")).toContainText(
-    "1 records found",
+    "3 records found",
   );
   await page.getByRole("button", { name: "Confirm import" }).click();
   await expect(page.locator(".import-preview")).toContainText("Import receipt");
@@ -247,44 +270,35 @@ test("API denies cross-origin mutation and restricted HR searches", async ({
   const json = await result.json();
   expect(json.results).toEqual([]);
 });
-test("unified Home search, featured agents and keyboard source previews work", async ({
+test("unified Home search and keyboard source previews work", async ({
   page,
 }) => {
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Main navigation" });
-  await expect(nav.getByRole("button").first()).toHaveText("New chat");
+  await expect(nav.getByRole("button").first()).toHaveText("Home");
+  await expect(page.getByRole("button", { name: "New chat" })).toBeVisible();
   await expect(
     nav.getByRole("button", { name: "Search", exact: true }),
   ).toHaveCount(0);
-  await expect(page.locator(".agent-card")).toHaveCount(4);
-  await expect(page.getByRole("heading", { name: "My tasks" })).toBeVisible();
+  const composer = page.getByRole("textbox", {
+    name: "Ask a question or describe a task",
+  });
+  await composer.fill("Alpha");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   const input = page.getByRole("searchbox", {
     name: "Search across Singularity",
   });
-  await input.pressSequentially("Alpha", { delay: 15 });
   await expect(input).toHaveValue("Alpha");
   await expect(page).toHaveURL(/\?q=Alpha/);
   await expect(page.locator(".result-row").first()).toBeVisible();
   await page.reload();
   await expect(input).toHaveValue("Alpha");
   await page
-    .getByLabel("Department", { exact: true })
-    .selectOption("Engineering");
-  await page.getByLabel("Owner", { exact: true }).selectOption("maya");
-  await expect
-    .poll(async () => {
-      const rows = await page.locator(".result-meta").allTextContents();
-      return (
-        rows.length > 0 &&
-        rows.every(
-          (row) => row.includes("Maya Rao") && row.includes("Engineering"),
-        )
-      );
-    })
-    .toBe(true);
-  await page
-    .getByRole("button", { name: "Clear filters", exact: true })
+    .locator(".search-tabs")
+    .getByRole("button", { name: "Documents", exact: true })
     .click();
+  await expect(page.locator(".result-row").first()).toBeVisible();
+  await page.getByRole("button", { name: "All", exact: true }).click();
   await input.fill("ThinkPad");
   await expect(page.locator(".result-row")).toHaveCount(1);
   await input.press("ArrowDown");
@@ -293,48 +307,18 @@ test("unified Home search, featured agents and keyboard source previews work", a
   await expect(page.locator(".source-preview")).toContainText("ThinkPad");
   await page.keyboard.press("Escape");
   await expect(page.locator(".source-preview")).toHaveCount(0);
-  await page.getByRole("button", { name: "Clear search", exact: true }).click();
-  await expect(page.locator(".agent-card")).toHaveCount(4);
+  await input.fill("");
   await page
-    .getByRole("button", { name: "Open IT Operations Agent", exact: true })
-    .click();
-  await expect(page).toHaveURL(/work\?agent=it/);
-  await expect(
-    page
-      .getByRole("heading", { name: "IT Operations Agent", exact: true })
-      .first(),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Run agent", exact: true }),
-  ).toBeVisible();
-  for (const [id, name] of [
-    ["project", "Project Agent"],
-    ["hr", "HR Agent"],
-    ["document", "Document Agent"],
-  ]) {
-    await page.goto("/");
-    await page
-      .getByRole("button", { name: "Open " + name, exact: true })
-      .click();
-    await expect(page).toHaveURL(new RegExp("agent=" + id));
-    await expect(
-      page.getByRole("heading", { name, exact: true }).first(),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Run agent", exact: true }),
-    ).toBeVisible();
-  }
-  await page
-    .getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "New chat", exact: true })
     .click();
   await expect(
     page.getByRole("textbox", { name: "Ask a question or describe a task" }),
   ).toHaveValue("");
   await page.goto("/");
-  await input.fill("Alpha");
+  await composer.fill("Alpha");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   await page
-    .getByRole("button", { name: "Ask BrahmaGPT", exact: true })
+    .getByRole("button", { name: "Ask about these records", exact: true })
     .click();
   await expect(page).toHaveURL(/\/chat\//);
   await expect(page.locator(".message.assistant")).toContainText(

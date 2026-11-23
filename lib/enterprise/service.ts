@@ -282,12 +282,22 @@ export function submit(
           "SELECT toId FROM relationships WHERE fromId=? AND relation='REPORTS_TO' ORDER BY rowid LIMIT 1",
         )
         .get(u.id) as { toId: string } | undefined;
-      if (!reportingLine)
+      const profile = db()
+        .prepare("SELECT data FROM records WHERE id=? AND type='People'")
+        .get(u.id) as { data: string } | undefined;
+      const profileManager = profile
+        ? (JSON.parse(profile.data) as { managerId?: string }).managerId
+        : undefined;
+      const managerId = reportingLine?.toId || profileManager;
+      if (
+        !managerId ||
+        !db().prepare("SELECT id FROM employees WHERE id=?").get(managerId)
+      )
         throw new WorkspaceError(
           "Your manager is not set in the organization directory",
           409,
         );
-      reviewer = employee(reportingLine.toId);
+      reviewer = employee(managerId);
       if (reviewer.id === u.id)
         throw new WorkspaceError(
           "A separate manager must review this draft",

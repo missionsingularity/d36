@@ -902,11 +902,32 @@ export default function EnterpriseWorkspace() {
                   type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowDown") {
+                      event.preventDefault();
+                      document
+                        .querySelector<HTMLButtonElement>(
+                          ".home-search-results .search-results .result-row",
+                        )
+                        ?.focus();
+                    }
+                    if (event.key === "Escape") setSearchActive(false);
+                  }}
                   placeholder="Search documents, people, projects, tasks..."
                   aria-label="Search across Singularity"
                 />
                 <kbd>Ctrl K</kbd>
               </label>
+              <div className="unified-search-actions">
+                <button
+                  className="primary"
+                  disabled={busy || !query.trim()}
+                  onClick={() => send(query)}
+                >
+                  <MessageSquare size={15} />
+                  Ask about these records
+                </button>
+              </div>
               <div className="search-tabs">
                 {[
                   "All",
@@ -1193,6 +1214,17 @@ export default function EnterpriseWorkspace() {
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  document
+                    .querySelector<HTMLButtonElement>(
+                      ".search-page .search-results .result-row",
+                    )
+                    ?.focus();
+                }
+                if (event.key === "Escape") setQuery("");
+              }}
               placeholder="Search documents, people, projects, tasks..."
               aria-label="Search across Singularity"
             />

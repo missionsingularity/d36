@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/enterprise/db";
-import { employee, WorkspaceError } from "@/lib/enterprise/service";
+import { identity, requireWorkspaceWriteAccess } from "@/lib/enterprise/auth";
+import { WorkspaceError } from "@/lib/enterprise/service";
 import {
   overview,
   runDetail,
@@ -15,16 +15,6 @@ import {
 import { z } from "zod";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-function identity(req: NextRequest) {
-  const token = req.cookies.get("singularity-session")?.value;
-  const row = token
-    ? (db()
-        .prepare("SELECT userId FROM sessions WHERE token=? AND expires>?")
-        .get(token, Date.now()) as { userId: string } | undefined)
-    : undefined;
-  if (!row) throw new WorkspaceError("Session required", 401);
-  return employee(row.userId);
-}
 function fail(e: unknown) {
   return NextResponse.json(
     { error: e instanceof Error ? e.message : "Request failed" },
@@ -41,6 +31,7 @@ function fail(e: unknown) {
 export async function GET(req: NextRequest) {
   try {
     const u = identity(req);
+    if (!u) throw new WorkspaceError("Session required", 401);
     const id = req.nextUrl.searchParams.get("run");
     return NextResponse.json(id ? runDetail(u, id) : overview(u));
   } catch (e) {
@@ -60,6 +51,8 @@ export async function POST(req: NextRequest) {
       throw new Error("Request too large");
     const u = identity(req),
       b = await req.json();
+    if (!u) throw new WorkspaceError("Session required", 401);
+    requireWorkspaceWriteAccess(u);
     let result: unknown;
     switch (b.action) {
       case "launch":

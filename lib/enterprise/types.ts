@@ -3,7 +3,7 @@ export type Employee = {
   name: string;
   email: string;
   department: string;
-  role: "employee" | "it_manager" | "hr_manager" | "admin";
+  role: "employee" | "it_manager" | "hr_manager" | "admin" | "viewer";
   leaveBalance: number;
 };
 export type RecordItem = {
