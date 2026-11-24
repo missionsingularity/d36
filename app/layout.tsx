@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./enterprise.css";
 import "./product.css";
 import { ThemeProvider } from "./theme-provider";
+import EnterpriseWorkspace from "./enterprise-workspace";
 export const metadata: Metadata = {
   title: "BrahmaGPT · Singularity",
   description: "Singularity workspace for company search, tasks and approvals.",
@@ -23,7 +25,12 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <Suspense fallback={<div className="loading">Opening your workspace…</div>}>
+            <EnterpriseWorkspace />
+          </Suspense>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
